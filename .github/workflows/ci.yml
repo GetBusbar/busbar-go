@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Regenerate client from openapi.json
+        run: make generate
+
+      - name: Fail if the committed client is stale
+        run: |
+          git diff --exit-code -- client.gen.go \
+            || (echo "::error::Generated client is out of date. Run 'make generate' and commit." && exit 1)
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...

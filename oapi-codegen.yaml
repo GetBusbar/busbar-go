@@ -1,0 +1,6 @@
+# oapi-codegen v2 config (pinned recipe). Regenerate with: make generate
+package: busbar
+output: client.gen.go
+generate:
+  models: true
+  client: true
