@@ -1,0 +1,103 @@
+# Keeps `main` continuously synced with busbarAI's `dev` branch OpenAPI spec, so
+# this SDK never strands again the way it did at 1.4.0 (see busbar-ui's
+# ENGINE-BUGS.md E-006). Polls the upstream spec file, and when it changes,
+# regenerates the client, proves it builds + vets clean, and pushes straight
+# to `main` on green. A no-op (clean exit) if the spec is unchanged.
+#
+# Why polling (not a push-triggered repository_dispatch from busbar's own CI):
+# busbar-go doesn't control GetBusbar/busbar's workflows, so wiring a dispatch
+# would require adding a step to busbar's CI plus a cross-repo PAT stored as a
+# secret in that repo. No such token exists today (busbar-go has no repo
+# secrets at all; busbar's only repo secrets are Docker Hub credentials and an
+# unused, unwired PULLS_WRITE_SECRET). Both repos are public, so the upstream
+# spec is fetched anonymously over raw.githubusercontent.com — no credential
+# needed for the read side either. Given no existing cross-repo credential to
+# build on, a tight poll (15 min, vs. headroom-release-watch's daily cadence)
+# is the self-contained fallback: no new secret, no changes needed in the
+# busbar repo. See RELEASING.md for the full rationale and how version tags
+# (a separate, manual action) get cut on top of this.
+#
+# This workflow does NOT cut a version tag — dev is unstable, and tagging
+# every synced commit would be bad semver practice for a `go get`-able
+# module. Tagging stays a distinct, manual action (see RELEASING.md).
+name: regen-from-upstream
+
+on:
+  schedule:
+    - cron: "*/15 * * * *" # every 15 minutes
+  workflow_dispatch: {}
+
+permissions:
+  contents: write # commit the regenerated client + push to main
+
+env:
+  UPSTREAM_RAW_URL: https://raw.githubusercontent.com/GetBusbar/busbar/dev/crates/busbar/src/admin/v1/json/openapi.json
+  UPSTREAM_API_URL: repos/GetBusbar/busbar/commits/dev
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Fetch upstream dev spec + resolve upstream sha
+        id: fetch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsSL "$UPSTREAM_RAW_URL" -o /tmp/upstream-openapi.json
+          sha="$(gh api "$UPSTREAM_API_URL" --jq .sha)"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "short=${sha:0:7}" >> "$GITHUB_OUTPUT"
+
+      - name: Diff against committed openapi.json
+        id: diff
+        run: |
+          set -euo pipefail
+          if diff -q /tmp/upstream-openapi.json openapi.json > /dev/null 2>&1; then
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+            echo "::notice::upstream openapi.json unchanged, nothing to do"
+          else
+            echo "changed=yes" >> "$GITHUB_OUTPUT"
+            echo "::notice::upstream openapi.json differs from committed spec, regenerating"
+          fi
+
+      - name: Regenerate, verify, and push on green
+        if: steps.diff.outputs.changed == 'yes'
+        env:
+          UPSTREAM_SHA: ${{ steps.fetch.outputs.sha }}
+          UPSTREAM_SHORT: ${{ steps.fetch.outputs.short }}
+        run: |
+          set -euo pipefail
+          cp /tmp/upstream-openapi.json openapi.json
+
+          make generate
+          make verify
+
+          if git diff --quiet -- openapi.json client.gen.go; then
+            echo "::notice::regeneration produced no diff after all (spec content-equal); nothing to commit"
+            exit 0
+          fi
+
+          new_version="$(python3 -c "import json; print(json.load(open('openapi.json'))['info']['version'])")"
+
+          git config user.name  "regen-from-upstream"
+          git config user.email "actions@users.noreply.github.com"
+          git add openapi.json client.gen.go
+          git commit -m "sync: regenerate from busbarAI dev @ ${UPSTREAM_SHORT}
+
+          Upstream openapi.json (busbar dev, spec version ${new_version}) changed at
+          GetBusbar/busbar@${UPSTREAM_SHA}. Regenerated client.gen.go via 'make generate'
+          and verified with 'make verify' (build + vet) before pushing.
+
+          This is a dev-tracking sync, not a release — no version tag is cut here.
+          See RELEASING.md for how tagging works."
+          git push origin HEAD:main
+          echo "::notice::synced busbar-go main to busbar dev@${UPSTREAM_SHORT} (spec ${new_version})"

@@ -14,7 +14,9 @@ import busbar "github.com/GetBusbar/busbar-go"
 ## Versioning
 
 The SDK carries its **own** semantic version, independent of the busbar server /
-OpenAPI `info.version` (currently `1.4.0`). This first cut is tagged **`v0.1.0`**.
+OpenAPI `info.version` (currently `1.5.0`). This first cut is tagged **`v0.1.0`**;
+`main` is now kept continuously synced with busbarAI's `dev` branch spec (see
+[RELEASING.md](./RELEASING.md)) — a new version tag hasn't been cut yet for 1.5.0.
 It targets the frozen, additive-only `/api/v1/admin` surface.
 
 Go modules publish via git tags — there is no registry token. `go get` fetches
@@ -53,7 +55,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	resp, err := client.GetApiV1AdminInfoWithResponse(context.Background())
+	resp, err := client.GetInfoWithResponse(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -63,7 +65,7 @@ func main() {
 
 	// resp.JSON200 is *InfoView — TYPED. .Version is string, .Topology is a struct.
 	info := resp.JSON200
-	fmt.Println("busbar version:", info.Version)        // -> "1.4.0"
+	fmt.Println("busbar version:", info.Version)        // -> "1.5.0"
 	fmt.Println("pools:", info.Topology.Pools)
 	fmt.Println("config version:", info.ConfigVersion)
 }
@@ -83,6 +85,10 @@ make generate     # runs the pinned oapi-codegen via go run
 
 The generator version is pinned in `go.mod` (via `tools.go`). CI regenerates on
 every PR/push and fails if the committed client drifts (`git diff --exit-code`).
+
+`main` is additionally kept auto-synced with busbarAI's `dev` branch spec by
+`.github/workflows/regen-from-upstream.yml` — see [RELEASING.md](./RELEASING.md)
+for how that works and how version tags get cut (separately, by hand).
 
 ## License
 
