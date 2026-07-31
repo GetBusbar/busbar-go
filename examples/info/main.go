@@ -29,7 +29,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	resp, err := client.GetApiV1AdminInfoWithResponse(context.Background())
+	resp, err := client.GetInfoWithResponse(context.Background())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func main() {
 
 	// resp.JSON200 is *InfoView — TYPED. .Version is a string, .Topology is a struct.
 	info := resp.JSON200
-	fmt.Println("busbar version:", info.Version) // -> "1.4.0"
+	fmt.Println("busbar version:", info.Version) // -> "1.5.0"
 	fmt.Println("pools:", info.Topology.Pools)
 	fmt.Println("config version:", info.ConfigVersion)
 }
