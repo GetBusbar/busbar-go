@@ -14,16 +14,18 @@ import busbar "github.com/GetBusbar/busbar-go"
 ## Versioning
 
 The SDK carries its **own** semantic version, independent of the busbar server /
-OpenAPI `info.version` (currently `1.5.0`). This first cut is tagged **`v0.1.0`**;
-`main` is now kept continuously synced with busbarAI's `dev` branch spec (see
-[RELEASING.md](./RELEASING.md)) — a new version tag hasn't been cut yet for 1.5.0.
+OpenAPI `info.version` (currently `1.5.0`). The current release is tagged
+**`v0.2.0`**, generated from the busbar `1.5.0` spec (which added
+`operationId`s, renaming every generated symbol — a breaking change from
+`v0.1.0`). `dev` is kept continuously synced with busbarAI's `dev` branch spec
+(see [RELEASING.md](./RELEASING.md)).
 It targets the frozen, additive-only `/api/v1/admin` surface.
 
 Go modules publish via git tags — there is no registry token. `go get` fetches
 straight from this repo:
 
 ```bash
-go get github.com/GetBusbar/busbar-go@v0.1.0
+go get github.com/GetBusbar/busbar-go@v0.2.0
 ```
 
 ## Usage
