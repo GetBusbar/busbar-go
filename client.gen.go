@@ -958,7 +958,16 @@ type PluginRollbackView struct {
 // `{name, schema}` so busbar-ui never has to infer trust state or the describe/manifest
 // precedence rule from context — the server always picks exactly one source and reports which.
 type PluginSchemaView struct {
-	Name string `json:"name"`
+	// Kind The plugin's `kind` (`hook` | `secret` | …) from its manifest. Both `GET /plugins/{file}/schema`
+	// and `POST /plugins/inspect` emit it (`null` only when the plugin cannot be resolved to a
+	// manifest). Declared so codegen'd clients keep it.
+	Kind *string `json:"kind,omitempty"`
+	Name string  `json:"name"`
+
+	// RestartRequiredDefault The kind-derived restart-scoping default (`busbar_plugin_sign::kind_restart_default`), so
+	// busbar-ui need not hardcode the kind→default table. Emitted by both schema endpoints (`null`
+	// only when the plugin has no resolvable manifest/kind). Declared so codegen'd clients keep it.
+	RestartRequiredDefault *bool `json:"restart_required_default,omitempty"`
 
 	// Schema The plugin's settings JSON Schema verbatim, or `null` — either because the manifest never
 	// set `settings_schema`, or (distinctly, see `schema_error`) because it did but the value
@@ -981,6 +990,12 @@ type PluginSchemaView struct {
 	// Trust `"trusted" | "unverified" | "rejected"` — the same vocabulary the plugin catalog already
 	// uses (never `"verified"`; question #8, round-4 correction).
 	Trust string `json:"trust"`
+
+	// Version The plugin's semantic version from its manifest. Present on `POST /plugins/inspect` (which
+	// previews an on-disk candidate's manifest); `null`/absent on `GET /plugins/{file}/schema`, which
+	// does not surface the version. Declared here so a codegen'd client keeps the field the inspect
+	// handler always sends, rather than silently dropping it.
+	Version *string `json:"version,omitempty"`
 }
 
 // PluginView One plugin in the plugin catalog (`GET /api/v1/admin/plugins?type=`). A plugin is either
