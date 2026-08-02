@@ -1,0 +1,145 @@
+name: release-on-upstream
+
+# Cut this SDK's next release when busbar core ships. For a Go module the tag IS the release
+# (`go get`-able from this repo), so this refreshes openapi.json on main from the new core release,
+# regenerates client.gen.go, and IF it changed and the module still builds+vets, cuts the next v0.x
+# tag — release.yml then re-validates the tagged commit. If regen is a no-op, no tag.
+#
+# Distinct from regen-from-upstream.yml, which continuously syncs the unstable `dev` branch off
+# busbar's dev spec and never tags. This one operates on `main` and only fires on a real core
+# release (or manually), and is the only workflow here that cuts a tag.
+#
+# RUNAWAY-SAFE: no plain `push:` trigger, so merging this file cannot cut a release.
+#   - repository_dispatch [upstream-release]: acts on the dispatched core tag (client_payload).
+#   - schedule: reads GetBusbar/busbar's latest release and acts ONLY if its spec version is newer
+#     than main's committed openapi.json — an idle day is a no-op, so cron can never runaway-tag.
+#   - workflow_dispatch: always acts (a human explicitly asked).
+# The final gate is a real git diff of client.gen.go plus a green build+vet: no diff or a broken
+# build never tags.
+on:
+  repository_dispatch:
+    types: [upstream-release]
+  schedule:
+    - cron: "41 5 * * *" # daily; minute staggered across the fleet so crons don't all fire at once
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "busbar core tag to build against (e.g. v1.6.0). Blank = core's latest release."
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-on-upstream-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "busbar-bot"
+          git config user.email "bot@getbusbar.com"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Resolve target core release
+        id: resolve
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          set -euo pipefail
+          committed="$(jq -r '.info.version' openapi.json)"
+          echo "committed spec version: $committed"
+          tag=""
+          case "$EVENT_NAME" in
+            repository_dispatch) tag="${DISPATCH_TAG:-}" ;;
+            workflow_dispatch)   tag="${INPUT_TAG:-}" ;;
+          esac
+          if [ -z "$tag" ]; then
+            tag="$(gh api repos/GetBusbar/busbar/releases/latest --jq .tag_name 2>/dev/null || true)"
+          fi
+          if [ -z "$tag" ]; then
+            echo "::notice::could not resolve a core release tag -> nothing to do"
+            echo "proceed=no" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          ver="${tag#v}"
+          echo "target core tag: $tag (spec version $ver)"
+          proceed=no
+          if [ "$EVENT_NAME" = workflow_dispatch ]; then
+            proceed=yes
+          elif [ "$(printf '%s\n%s\n' "$committed" "$ver" | sort -V | tail -1)" = "$ver" ] && [ "$ver" != "$committed" ]; then
+            proceed=yes
+          else
+            echo "::notice::core spec v$ver not newer than committed v$committed -> nothing to do"
+          fi
+          {
+            echo "proceed=$proceed"
+            echo "tag=$tag"
+            echo "ver=$ver"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Refresh spec, regenerate, and cut a tag if the client changed
+        if: steps.resolve.outputs.proceed == 'yes'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_DISPATCH_TOKEN }}
+          CORE_TAG: ${{ steps.resolve.outputs.tag }}
+          CORE_VER: ${{ steps.resolve.outputs.ver }}
+        run: |
+          set -euo pipefail
+          ops() { jq -r '[.paths[] | (.get,.put,.post,.delete,.patch,.options,.head) | .operationId?] | map(select(. != null)) | sort | @json' "$1"; }
+          ops_old="$(ops openapi.json)"
+
+          gh release download "$CORE_TAG" --repo GetBusbar/busbar \
+            --pattern "busbar-openapi-v${CORE_VER}.json" --output openapi.json.new
+          mv openapi.json.new openapi.json
+          ops_new="$(ops openapi.json)"
+
+          make generate
+          make verify # build + vet — never tag a commit that does not build
+
+          if git diff --quiet -- client.gen.go; then
+            if git diff --quiet -- openapi.json; then
+              echo "::notice::spec + client identical -> idempotent no-op"
+            else
+              git add openapi.json
+              git commit -m "spec: refresh openapi.json to busbar ${CORE_TAG} (generated client unchanged)"
+              git push origin HEAD:main
+              echo "::notice::spec refreshed to ${CORE_TAG}; client unchanged, no tag cut"
+            fi
+            exit 0
+          fi
+
+          latest="$(git tag -l 'v*' --sort=-v:refname | head -1)"
+          base="${latest#v}"; IFS=. read -r MA MI PA <<< "$base"
+          if [ "$ops_old" != "$ops_new" ]; then
+            next="v${MA}.$((MI + 1)).0"; echo "::notice::operationId surface changed -> minor bump"
+          else
+            next="v${MA}.${MI}.$((PA + 1))"; echo "::notice::client changed, surface stable -> patch bump"
+          fi
+
+          if git rev-parse -q --verify "refs/tags/${next}" >/dev/null; then
+            echo "::notice::${next} already exists -> idempotent no-op"; exit 0
+          fi
+
+          git add openapi.json client.gen.go
+          git commit -m "release: ${next} — regenerate against busbar ${CORE_TAG} spec"
+          git push origin HEAD:main
+          git tag "$next"
+          git push origin "refs/tags/${next}"
+          echo "::notice::pushed ${next} — go get github.com/GetBusbar/busbar-go@${next}"
