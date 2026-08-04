@@ -225,9 +225,9 @@ type ConfigRollbackView struct {
 // ConfigSettingsView `GET`/`PUT /config/settings` (1.5.0 full-config coverage) — the API-settable single-value config
 // overlay (`root` section) and, on a PUT, the apply metadata. `settings` is the CURRENT effective
 // root override (the merge of prior overlay + this request). It is overlay-persisted so it survives
-// a restart WHEN a config overlay is configured (`BUSBAR_CONFIG_OVERLAY`) — a busbar with none
-// applies the change live only, and `note` says so; `PUT` with `"persist": true` makes storage
-// mandatory, refusing (`400`) rather than silently applying in memory when no overlay exists.
+// a restart. 1.5.3: a MUTABLE config always has a writable `config.overlay` backend (the boot
+// invariant), so a successful PUT is ALWAYS durable; a LOCKED config (`config.locked: true`) refuses
+// the PUT (`400`) instead of applying it in memory only — the silent-loss outcome is gone.
 // `reload_to_apply` names the fields whose new value is DURABLY STORED but not yet LIVE: the
 // process-level binds (`listen`/`admin_listen` socket, `tls`/`admin_tls` bind, `admin_insecure`) are
 // read once at process start, and the durable `store` backend is reused across a hot reload — none
@@ -644,9 +644,10 @@ type InfoView struct {
 	// Build The compiled-in feature proof (`InfoView.build`).
 	Build BuildInfo `json:"build"`
 
-	// ConfigPersistence Whether config-overlay persistence is enabled (`BUSBAR_CONFIG_OVERLAY` set): `true` = API-applied
-	// config changes are durable across restarts; `false` = live-only (lost on restart). Lets tooling
-	// tell an operator whether their runtime changes will survive a restart.
+	// ConfigPersistence Whether config-overlay persistence is enabled — i.e. the config is MUTABLE with a writable
+	// `config.overlay` backend: `true` = API-applied config changes are durable across restarts;
+	// `false` = the config is LOCKED (`config.locked: true`) and admin-API config mutations are
+	// refused. Lets tooling tell an operator whether runtime changes are accepted and durable.
 	ConfigPersistence bool `json:"config_persistence"`
 
 	// ConfigVersion Monotonic config version — `0` at boot, +1 per API config apply. Drift-detection: re-read and
