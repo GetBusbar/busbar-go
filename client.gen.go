@@ -600,7 +600,7 @@ type HookTransportView struct {
 // secret. `global` reports whether the hook fires on every request (named in `global_hooks:` or
 // declared `global: true`). Live connection status (`health`) is a separate endpoint. Additive-only.
 type HookView struct {
-	// At TAP observation stage (`"request"`/`"route"`/`"attempt"`/`"completion"`), or `None` for a gate.
+	// At TAP observation stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or `None` for a gate.
 	At *string `json:"at"`
 
 	// Global Whether this hook fires on every request (globally wired).
