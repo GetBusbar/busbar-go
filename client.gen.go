@@ -229,9 +229,10 @@ type ConfigRollbackView struct {
 // invariant), so a successful PUT is ALWAYS durable; a LOCKED config (`config.locked: true`) refuses
 // the PUT (`400`) instead of applying it in memory only — the silent-loss outcome is gone.
 // `reload_to_apply` names the fields whose new value is DURABLY STORED but not yet LIVE: the
-// process-level binds (`listen`/`admin_listen` socket, `tls`/`admin_tls` bind, `admin_insecure`) are
-// read once at process start, and the durable `store` backend is reused across a hot reload — none
-// can hot-swap, so they take effect on the next RESTART (or a supervisor restart), NEVER on a
+// process-level binds (`listen`/`admin_listen` socket, `tls`/`admin_tls` bind, and the
+// `admin_require_mtls` boot-guard) are read once at process start, and the durable `store` backend
+// is reused across a hot reload — none can hot-swap, so they take effect on the next RESTART (or a
+// supervisor restart), NEVER on a
 // `POST /config/reload` — a reload re-reads disk and rebuilds the `App` but does not rebind sockets,
 // rebuild the TLS acceptor, or re-open the store. It is always EMPTY when nothing was durably stored
 // (no overlay); `note` names the affected fields instead. Everything else
@@ -1917,14 +1918,14 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/config/settings (the `GetConfigSettings` operationId).
 	GetConfigSettings(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutConfigSettingsWithBody SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+	// PutConfigSettingsWithBody SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/v1/admin/config/settings (the `PutConfigSettings` operationId).
 	PutConfigSettingsWithBody(ctx context.Context, params *PutConfigSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutConfigSettings SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+	// PutConfigSettings SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2330,14 +2331,14 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/providers (the `GetProviders` operationId).
 	GetProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostRestartWithBody Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+	// PostRestartWithBody Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /api/v1/admin/restart (the `PostRestart` operationId).
 	PostRestartWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PostRestart Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+	// PostRestart Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2596,7 +2597,7 @@ func (c *Client) GetConfigSettings(ctx context.Context, reqEditors ...RequestEdi
 	return c.Client.Do(req)
 }
 
-// PutConfigSettingsWithBody SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+// PutConfigSettingsWithBody SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 //
 // Takes any type of body and a specified content type.
 //
@@ -2613,7 +2614,7 @@ func (c *Client) PutConfigSettingsWithBody(ctx context.Context, params *PutConfi
 	return c.Client.Do(req)
 }
 
-// PutConfigSettings SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+// PutConfigSettings SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3699,7 +3700,7 @@ func (c *Client) GetProviders(ctx context.Context, reqEditors ...RequestEditorFn
 	return c.Client.Do(req)
 }
 
-// PostRestartWithBody Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+// PostRestartWithBody Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 //
 // Takes any type of body and a specified content type.
 //
@@ -3716,7 +3717,7 @@ func (c *Client) PostRestartWithBody(ctx context.Context, contentType string, bo
 	return c.Client.Do(req)
 }
 
-// PostRestart Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+// PostRestart Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6824,14 +6825,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/config/settings (the `GetConfigSettings` operationId).
 	GetConfigSettingsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetConfigSettingsResponse, error)
 
-	// PutConfigSettingsWithBodyWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+	// PutConfigSettingsWithBodyWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/admin/config/settings (the `PutConfigSettings` operationId).
 	PutConfigSettingsWithBodyWithResponse(ctx context.Context, params *PutConfigSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutConfigSettingsResponse, error)
 
-	// PutConfigSettingsWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+	// PutConfigSettingsWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7307,14 +7308,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/providers (the `GetProviders` operationId).
 	GetProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetProvidersResponse, error)
 
-	// PostRestartWithBodyWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+	// PostRestartWithBodyWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /api/v1/admin/restart (the `PostRestart` operationId).
 	PostRestartWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostRestartResponse, error)
 
-	// PostRestartWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+	// PostRestartWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -12540,7 +12541,7 @@ func (c *ClientWithResponses) GetConfigSettingsWithResponse(ctx context.Context,
 	return ParseGetConfigSettingsResponse(rsp)
 }
 
-// PutConfigSettingsWithBodyWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+// PutConfigSettingsWithBodyWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12553,7 +12554,7 @@ func (c *ClientWithResponses) PutConfigSettingsWithBodyWithResponse(ctx context.
 	return ParsePutConfigSettingsResponse(rsp)
 }
 
-// PutConfigSettingsWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_insecure/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
+// PutConfigSettingsWithResponse SET any single-value config section durably (1.5.0 full-config coverage): partial RootSettings merged onto the overlay, re-resolved + validated, swapped in. rate_card/per_request_fee/security/limits/… go live; listen/tls/admin_listen/admin_tls/admin_require_mtls/store are stored + flagged restart-to-apply (bound once at start / store reused across a hot reload). NEVER writes config.yaml
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13437,7 +13438,7 @@ func (c *ClientWithResponses) GetProvidersWithResponse(ctx context.Context, reqE
 	return ParseGetProvidersResponse(rsp)
 }
 
-// PostRestartWithBodyWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+// PostRestartWithBodyWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13450,7 +13451,7 @@ func (c *ClientWithResponses) PostRestartWithBodyWithResponse(ctx context.Contex
 	return ParsePostRestartResponse(rsp)
 }
 
-// PostRestartWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_insecure, store). Drains first; the supervisor brings it back
+// PostRestartWithResponse Restart busbar to apply the restart-scoped settings (listen, admin_listen, tls, admin_tls, admin_require_mtls, store). Drains first; the supervisor brings it back
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
