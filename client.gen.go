@@ -241,10 +241,21 @@ type ConfigRollbackView struct {
 // `upstream_request_timeout_secs`/`pool_max_idle_per_host`/`pool_idle_timeout_secs`, which the
 // reused `UpstreamClients` only reads once at boot, and `max_inbound_concurrent`, which is baked
 // once into the data router's `GlobalConcurrencyLimitLayer` at process start (a config apply swaps
-// only `Arc<App>`, never the router) — two independent freezing mechanisms. `observability` is live
-// EXCEPT `otlp_url` (feeds a one-shot `tracing_subscriber` init, boot-frozen). (1.5.3: the
-// request-log webhook + Prometheus metrics retired out of the single-value settings surface into the
-// built-in `export:` exporters, edited in `config.yaml` + applied via plugin reload.)
+// only `Arc<App>`, never the router) — two independent freezing mechanisms. There is NO
+// `observability` section here, and no `metrics` one either: 1.5.3 DELETED both from the config
+// grammar, and `RootSettings` (what this endpoint projects) carries neither field — a PUT naming
+// `observability` is a loud `400` (`deny_unknown_fields`), never a silent no-op. All telemetry
+// egress is now `export:`, a NAMED MAP of exporter instances that this endpoint does not reach at
+// all: it is edited in `config.yaml` and made live by a plugin reload, not by `PUT /config/settings`.
+// Each `export:` entry is keyed by an operator-chosen instance name and carries a `module:` naming
+// the exporter plus a `settings:` bag that module validates, and MAY carry a `streams:`
+// subscription list. The built-in modules are `prometheus` (carries the `metrics` stream), `otlp`
+// (`traces`), and `request-log-webhook` + `request-log-file` (`logs`); subscribing an instance to a
+// stream its module does not carry is rejected rather than silently delivering nothing. An entry
+// MAY also carry a `fields:` projection, but do NOT plan on it in 1.5.3: it is parsed and enforced
+// yet unreachable with every built-in module, because each stream they carry has a pinned field
+// that has no producer yet, so any `fields:` on them is rejected. Omit it and receive the stream's
+// produced default set.
 // `advanced` is live EXCEPT `response_headers` (task #139): `response_headers.server_timing` is
 // baked into router middleware state at boot (same "config apply swaps `Arc<App>`, never the
 // router" freezing as `max_inbound_concurrent`) and `response_headers.route_policy` seeds a
@@ -407,7 +418,10 @@ type EffectiveConfigView struct {
 	// identifiers, not credentials. An empty `chain` is the open front door (admits every request).
 	Auth AuthView `json:"auth"`
 
-	// GlobalHooks Names fired on every request (`global_hooks:` + any inline `global: true`).
+	// GlobalHooks Names fired on EVERY request: the hooks attached at the reserved all-pools key `pools.hooks:`
+	// in `config.yaml` (the 1.5.3 replacement for the DELETED `global_hooks:` key — that key no
+	// longer parses), plus any hook this API declares with `global: true`. The response FIELD name
+	// stays `global_hooks`; only the config-file spelling changed.
 	GlobalHooks []string       `json:"global_hooks"`
 	Hooks       []HookView     `json:"hooks"`
 	Models      []ModelView    `json:"models"`
@@ -617,9 +631,14 @@ type HookTransportView struct {
 // HookView A hook definition in the registry read (`GET /api/v1/admin/hooks`, `GET /api/v1/admin/hooks/{name}`) — the
 // plugin catalog read. Projects the DEFINITION (kind, transport, grants, ordering, stage), never a
 // secret — INCLUDING the `settings:` bag, which is projected as KEY NAMES only (see
-// [`HookView::settings_keys`]). `global` reports whether the hook fires on every request (named in
-// `global_hooks:` or declared `global: true`). Live connection status (`health`) is a separate
-// endpoint. Additive-only.
+// [`HookView::settings_keys`]). `global` reports whether the hook fires on EVERY request. There is
+// no `global_hooks:` config key to write: 1.5.3 deleted it, and a hook is now DEFINED once in the
+// top-level `hooks:` named map (its `module:` naming the `kind: hook` plugin that backs it) and
+// ATTACHED by bare name — at the reserved all-pools key `pools.hooks:`, which is what makes it
+// global, or at one pool's own `hooks:` list. `groups:` and `phase:` are the config-file selection
+// axes (which callers, which pipeline stages). On THIS API the same hook is written with
+// `global: true`; the wire and the config file are deliberately different surfaces. Live connection
+// status (`health`) is a separate endpoint. Additive-only.
 type HookView struct {
 	// At TAP observation stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or `None` for a gate.
 	At *string `json:"at"`
