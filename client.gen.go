@@ -264,7 +264,13 @@ type ConfigSettingsView struct {
 	ReloadToApply *[]string `json:"reload_to_apply,omitempty"`
 
 	// Settings The current effective root-section overlay (only the fields the operator has set; base
-	// `config.yaml` stands for the rest). An arbitrary JSON object (the `RootSettings` projection).
+	// `config.yaml` stands for the rest). An arbitrary JSON object (the `RootSettings` projection),
+	// REDACTED by `service::redact_settings_bags`: every opaque `settings:` bag inside it (today
+	// `store.settings`, whose `url` is a credential in busbar's own docs) appears as
+	// `settings_keys` — sorted key names, no values. Same on the GET and on the PUT echo.
+	//
+	// This field NAME is frozen wire and is the response ENVELOPE member, not a plugin settings
+	// bag; the redaction applies to the bags nested INSIDE it.
 	Settings interface{} `json:"settings"`
 }
 
@@ -501,10 +507,11 @@ type GroupView struct {
 }
 
 // HookDesiredStatus The DESIRED settings side of `hooks/{name}/status`: busbar's registry copy of the hook's settings
-// and their version.
+// (KEY NAMES only — see [`super::HookView::settings_keys`]) and their version.
 type HookDesiredStatus struct {
-	Settings        map[string]interface{} `json:"settings"`
-	SettingsVersion uint64                 `json:"settings_version"`
+	// SettingsKeys Sorted KEY NAMES of the desired settings bag, never its values.
+	SettingsKeys    []string `json:"settings_keys"`
+	SettingsVersion uint64   `json:"settings_version"`
 }
 
 // HookHealthView The live health of one hook's transport (`GET /api/v1/admin/hooks/{name}/health`). Checks
@@ -532,9 +539,15 @@ type HookHealthView struct {
 
 // HookReportedStatus The REPORTED settings side of `hooks/{name}/status`: what the hook says it is actually running
 // (present only when the hook answered `status`).
+//
+// KEY NAMES only, and for a sharper reason than the desired side: the reported bag is the hook's
+// ECHO of the SECRET-RESOLVED settings busbar pushed it, i.e. the PLAINTEXT of every `SecretRef` —
+// and this read is reachable at READ-ONLY admin scope. `null` when the hook answered `status` but
+// reported no settings.
 type HookReportedStatus struct {
-	Settings        *map[string]interface{} `json:"settings"`
-	SettingsVersion *uint64                 `json:"settings_version"`
+	// SettingsKeys Sorted KEY NAMES of the observed settings bag, never its values.
+	SettingsKeys    *[]string `json:"settings_keys"`
+	SettingsVersion *uint64   `json:"settings_version"`
 }
 
 // HookSchemaView `GET /hooks/{name}/schema` — the hook's self-described settings JSON Schema (proxied over the
@@ -553,9 +566,14 @@ type HookStatusView struct {
 	AsOf uint64 `json:"as_of"`
 
 	// Desired The DESIRED settings side of `hooks/{name}/status`: busbar's registry copy of the hook's settings
-	// and their version.
+	// (KEY NAMES only — see [`super::HookView::settings_keys`]) and their version.
 	Desired HookDesiredStatus `json:"desired"`
 	Drift   *bool             `json:"drift"`
+
+	// DriftKeys The DESIRED settings KEY NAMES the hook is not actually running — the actionable half of
+	// `drift`, carrying names this body already serves and no value from either bag. Invariantly an
+	// array (empty on the no-answer branch, where no drift is known).
+	DriftKeys []string `json:"drift_keys"`
 
 	// Metrics Validated + bounded self-reported metrics; each entry carries `{name, type, value}` and, when
 	// the hook sent them, optional `labels`/`quantiles`/`estimated`/`ci_low`/`ci_high`/`help`/
@@ -597,8 +615,10 @@ type HookTransportView struct {
 
 // HookView A hook definition in the registry read (`GET /api/v1/admin/hooks`, `GET /api/v1/admin/hooks/{name}`) — the
 // plugin catalog read. Projects the DEFINITION (kind, transport, grants, ordering, stage), never a
-// secret. `global` reports whether the hook fires on every request (named in `global_hooks:` or
-// declared `global: true`). Live connection status (`health`) is a separate endpoint. Additive-only.
+// secret — INCLUDING the `settings:` bag, which is projected as KEY NAMES only (see
+// [`HookView::settings_keys`]). `global` reports whether the hook fires on every request (named in
+// `global_hooks:` or declared `global: true`). Live connection status (`health`) is a separate
+// endpoint. Additive-only.
 type HookView struct {
 	// At TAP observation stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or `None` for a gate.
 	At *string `json:"at"`
@@ -623,9 +643,17 @@ type HookView struct {
 	// Prompt Prompt access grant: `"no"` | `"ro"` | `"rw"`.
 	Prompt string `json:"prompt"`
 
-	// Settings The hook's opaque settings map (operator/API-owned; pushed via the configure wire). Never
-	// interpreted by busbar; never a secret by contract (hook settings are operator config).
-	Settings map[string]interface{} `json:"settings"`
+	// SettingsKeys The KEY NAMES of the hook's opaque settings bag, sorted, WITHOUT their values — the same
+	// redacted projection [`NamedDefView::settings_keys`] carries, produced by the same helper.
+	//
+	// This used to be the bag itself, under a doc comment claiming hook settings are "never a
+	// secret by contract". That claim was retracted for `NamedDefView` and it is no more true here:
+	// a hook's settings bag is a `SecretRef` carrier by design (`hooks::HookEnv::resolve_hook_settings`
+	// resolves it before every configure push), and `config::secret::resolve_settings` forwards a
+	// non-object bag verbatim, so a literal credential is fully supported too. `GET /hooks` and
+	// `GET /hooks/{name}` serve this at READ-ONLY admin scope. The values are readable only where
+	// they are writable — the config file and the config overlay.
+	SettingsKeys []string `json:"settings_keys"`
 
 	// TimeoutMs Gate decision deadline in milliseconds.
 	TimeoutMs uint64 `json:"timeout_ms"`
@@ -868,6 +896,14 @@ type NamedDefView struct {
 	// TokenConfigured `identity-providers` ONLY: whether a `token:` secret REFERENCE is configured (the built-in
 	// `admin-tokens` operator credential). The reference itself is never projected.
 	TokenConfigured *bool `json:"token_configured,omitempty"`
+
+	// Unparseable Set ONLY on an entry that is STORED in the config overlay but could NOT be parsed into this
+	// section's typed config by this binary (a downgrade whose struct lost a field, a hand-edited
+	// overlay) — the value is the parse error. Such an entry is dropped at every rebuild, so it is
+	// NOT live: `module`/`settings_keys` are the raw stored document's best-effort projection, not
+	// a resolved definition. Present so the drop is DISCOVERABLE here rather than only in a boot
+	// log line. Absent (and omitted from the body) for every live definition.
+	Unparseable *string `json:"unparseable,omitempty"`
 }
 
 // NamedSettingsReq The `PATCH /api/v1/admin/<section>/{name}/settings` body — the whole replacement settings bag.
