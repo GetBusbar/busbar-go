@@ -824,6 +824,50 @@ type ModelView struct {
 	Provider string `json:"provider"`
 }
 
+// NamedDefView ONE definition of ONE 1.5.3 named-DEFINITION map — the read shape of the GENERIC named-map CRUD
+// (`GET /api/v1/admin/identity-providers[/{name}]`, `GET /api/v1/admin/export[/{name}]`, and
+// `tools:`/`agents:` when they land).
+//
+// Deliberately ONE view for every section rather than one per kind: the sections share the frozen
+// `{module, settings}` spine and differ only by optional kind-specific fields, which are
+// `skip_serializing_if`-omitted for a section that has none. So `/export` serves exactly
+// `{name, module, settings}` while `/identity-providers` additionally carries its ceiling — and a
+// new section adds fields here (additive) instead of a parallel view + a parallel handler.
+//
+// SECRETS ARE NEVER PROJECTED, by construction: an `identity-providers.<name>.token:` is a SECRET
+// REFERENCE, and this view reports only WHETHER one is configured — there is no field the reference
+// (let alone a resolved value) could ride out on.
+type NamedDefView struct {
+	// BrowserLoginConfigured `identity-providers` ONLY: whether a `browser_login:` block is configured — the presence that
+	// puts a button on the hosted login page.
+	BrowserLoginConfigured *bool `json:"browser_login_configured,omitempty"`
+
+	// MaxAdminScope `identity-providers` ONLY: the per-provider ADMIN CEILING (`none` | `read-only` | `full`).
+	// `None` ⇒ the definition names none, so the most restrictive default applies. Omitted entirely
+	// for a section that carries no ceiling.
+	MaxAdminScope *string `json:"max_admin_scope,omitempty"`
+
+	// Module The `module:` backing this instance (a built-in name or a signed-plugin name/alias).
+	Module string `json:"module"`
+
+	// Name The instance NAME — the map key, and the token every reference site uses.
+	Name string `json:"name"`
+
+	// Settings The module's opaque settings bag, verbatim. Operator/API-owned; never interpreted here.
+	Settings map[string]interface{} `json:"settings"`
+
+	// TokenConfigured `identity-providers` ONLY: whether a `token:` secret REFERENCE is configured (the built-in
+	// `admin-tokens` operator credential). The reference itself is never projected.
+	TokenConfigured *bool `json:"token_configured,omitempty"`
+}
+
+// NamedSettingsReq The `PATCH /api/v1/admin/<section>/{name}/settings` body — the whole replacement settings bag.
+// A sibling of the hooks surface's `PatchSettingsReq` (same shape, same semantics: `settings:` is
+// REPLACED, not deep-merged, so the stored bag is always exactly what the caller sent).
+type NamedSettingsReq struct {
+	Settings map[string]interface{} `json:"settings"`
+}
+
 // OverlayResetView `DELETE /overlay/{section}` — per-section overlay reset result: the section reverted, the
 // resulting config version, and whether anything changed (`false` = the section had no overlay state,
 // an idempotent no-op).
@@ -855,6 +899,13 @@ type PageHookView struct {
 type PageModelView struct {
 	Items      []ModelView `json:"items"`
 	NextCursor *string     `json:"next_cursor"`
+}
+
+// PageNamedDefView A cursor-paginated list envelope. `items` is this page; `next_cursor` is `Some` when more remain.
+// Generic over the item view so every list endpoint shares one shape.
+type PageNamedDefView struct {
+	Items      []NamedDefView `json:"items"`
+	NextCursor *string        `json:"next_cursor"`
 }
 
 // PagePluginView A cursor-paginated list envelope. `items` is this page; `next_cursor` is `Some` when more remain.
@@ -1395,6 +1446,27 @@ type GetConfigVersionsParams struct {
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// DeleteExportNameParams defines parameters for DeleteExportName.
+type DeleteExportNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PutExportNameJSONBody defines parameters for PutExportName.
+type PutExportNameJSONBody map[string]interface{}
+
+// PutExportNameParams defines parameters for PutExportName.
+type PutExportNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PatchExportNameSettingsParams defines parameters for PatchExportNameSettings.
+type PatchExportNameSettingsParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // PostGroupsJSONBody defines parameters for PostGroups.
 type PostGroupsJSONBody struct {
 	// Config A `groups:` entry, as JSON. The accepted shape is the config file's own, documented in the configuration reference; it is not restated here because several of its types parse a wire shape that does not match their field layout.
@@ -1478,6 +1550,27 @@ type PutHooksNameParams struct {
 
 // PatchHooksNameSettingsParams defines parameters for PatchHooksNameSettings.
 type PatchHooksNameSettingsParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// DeleteIdentityProvidersNameParams defines parameters for DeleteIdentityProvidersName.
+type DeleteIdentityProvidersNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PutIdentityProvidersNameJSONBody defines parameters for PutIdentityProvidersName.
+type PutIdentityProvidersNameJSONBody map[string]interface{}
+
+// PutIdentityProvidersNameParams defines parameters for PutIdentityProvidersName.
+type PutIdentityProvidersNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PatchIdentityProvidersNameSettingsParams defines parameters for PatchIdentityProvidersNameSettings.
+type PatchIdentityProvidersNameSettingsParams struct {
 	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
 	IfMatch *string `json:"If-Match,omitempty"`
 }
@@ -1566,6 +1659,12 @@ type PutConfigSettingsJSONRequestBody PutConfigSettingsJSONBody
 // PostConfigValidateJSONRequestBody defines body for PostConfigValidate for application/json ContentType.
 type PostConfigValidateJSONRequestBody PostConfigValidateJSONBody
 
+// PutExportNameJSONRequestBody defines body for PutExportName for application/json ContentType.
+type PutExportNameJSONRequestBody PutExportNameJSONBody
+
+// PatchExportNameSettingsJSONRequestBody defines body for PatchExportNameSettings for application/json ContentType.
+type PatchExportNameSettingsJSONRequestBody = NamedSettingsReq
+
 // PostGroupsJSONRequestBody defines body for PostGroups for application/json ContentType.
 type PostGroupsJSONRequestBody PostGroupsJSONBody
 
@@ -1583,6 +1682,12 @@ type PutHooksNameJSONRequestBody PutHooksNameJSONBody
 
 // PatchHooksNameSettingsJSONRequestBody defines body for PatchHooksNameSettings for application/json ContentType.
 type PatchHooksNameSettingsJSONRequestBody = PatchSettingsReq
+
+// PutIdentityProvidersNameJSONRequestBody defines body for PutIdentityProvidersName for application/json ContentType.
+type PutIdentityProvidersNameJSONRequestBody PutIdentityProvidersNameJSONBody
+
+// PatchIdentityProvidersNameSettingsJSONRequestBody defines body for PatchIdentityProvidersNameSettings for application/json ContentType.
+type PatchIdentityProvidersNameSettingsJSONRequestBody = NamedSettingsReq
 
 // PostKeysJSONRequestBody defines body for PostKeys for application/json ContentType.
 type PostKeysJSONRequestBody = CreateKeyReq
@@ -1805,6 +1910,49 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/config/versions/{v} (the `GetConfigVersionsV` operationId).
 	GetConfigVersionsV(ctx context.Context, v int, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetExport Every `export:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Corresponds with GET /api/v1/admin/export (the `GetExport` operationId).
+	GetExport(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteExportName Remove one `export:` definition — refused while another config section still references it by bare name
+	//
+	// Corresponds with DELETE /api/v1/admin/export/{name} (the `DeleteExportName` operationId).
+	DeleteExportName(ctx context.Context, name string, params *DeleteExportNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetExportName One `export:` definition
+	//
+	// Corresponds with GET /api/v1/admin/export/{name} (the `GetExportName` operationId).
+	GetExportName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutExportNameWithBody Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+	PutExportNameWithBody(ctx context.Context, name string, params *PutExportNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutExportName Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+	PutExportName(ctx context.Context, name string, params *PutExportNameParams, body PutExportNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchExportNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+	PatchExportNameSettingsWithBody(ctx context.Context, name string, params *PatchExportNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchExportNameSettings Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+	PatchExportNameSettings(ctx context.Context, name string, params *PatchExportNameSettingsParams, body PatchExportNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetGroups Group registry — the limit tree (parent chain, limits, child_default budget template)
 	//
 	// Corresponds with GET /api/v1/admin/groups (the `GetGroups` operationId).
@@ -1938,6 +2086,49 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /api/v1/admin/hooks/{name}/status (the `GetHooksNameStatus` operationId).
 	GetHooksNameStatus(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetIdentityProviders Every `identity-providers:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Corresponds with GET /api/v1/admin/identity-providers (the `GetIdentityProviders` operationId).
+	GetIdentityProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteIdentityProvidersName Remove one `identity-providers:` definition — refused while another config section still references it by bare name
+	//
+	// Corresponds with DELETE /api/v1/admin/identity-providers/{name} (the `DeleteIdentityProvidersName` operationId).
+	DeleteIdentityProvidersName(ctx context.Context, name string, params *DeleteIdentityProvidersNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetIdentityProvidersName One `identity-providers:` definition
+	//
+	// Corresponds with GET /api/v1/admin/identity-providers/{name} (the `GetIdentityProvidersName` operationId).
+	GetIdentityProvidersName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutIdentityProvidersNameWithBody Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+	PutIdentityProvidersNameWithBody(ctx context.Context, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutIdentityProvidersName Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+	PutIdentityProvidersName(ctx context.Context, name string, params *PutIdentityProvidersNameParams, body PutIdentityProvidersNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchIdentityProvidersNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+	PatchIdentityProvidersNameSettingsWithBody(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchIdentityProvidersNameSettings Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+	PatchIdentityProvidersNameSettings(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, body PatchIdentityProvidersNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetInfo Version, compiled-in plugin proof, uptime, topology
 	//
@@ -2458,6 +2649,119 @@ func (c *Client) GetConfigVersionsV(ctx context.Context, v int, reqEditors ...Re
 	return c.Client.Do(req)
 }
 
+// GetExport Every `export:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Corresponds with GET /api/v1/admin/export (the `GetExport` operationId).
+func (c *Client) GetExport(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExportRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteExportName Remove one `export:` definition — refused while another config section still references it by bare name
+//
+// Corresponds with DELETE /api/v1/admin/export/{name} (the `DeleteExportName` operationId).
+func (c *Client) DeleteExportName(ctx context.Context, name string, params *DeleteExportNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteExportNameRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetExportName One `export:` definition
+//
+// Corresponds with GET /api/v1/admin/export/{name} (the `GetExportName` operationId).
+func (c *Client) GetExportName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetExportNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutExportNameWithBody Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+func (c *Client) PutExportNameWithBody(ctx context.Context, name string, params *PutExportNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutExportNameRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutExportName Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+func (c *Client) PutExportName(ctx context.Context, name string, params *PutExportNameParams, body PutExportNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutExportNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchExportNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+func (c *Client) PatchExportNameSettingsWithBody(ctx context.Context, name string, params *PatchExportNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchExportNameSettingsRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchExportNameSettings Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+func (c *Client) PatchExportNameSettings(ctx context.Context, name string, params *PatchExportNameSettingsParams, body PatchExportNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchExportNameSettingsRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetGroups Group registry — the limit tree (parent chain, limits, child_default budget template)
 //
 // Corresponds with GET /api/v1/admin/groups (the `GetGroups` operationId).
@@ -2802,6 +3106,119 @@ func (c *Client) PatchHooksNameSettings(ctx context.Context, name string, params
 // Corresponds with GET /api/v1/admin/hooks/{name}/status (the `GetHooksNameStatus` operationId).
 func (c *Client) GetHooksNameStatus(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetHooksNameStatusRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetIdentityProviders Every `identity-providers:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Corresponds with GET /api/v1/admin/identity-providers (the `GetIdentityProviders` operationId).
+func (c *Client) GetIdentityProviders(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetIdentityProvidersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteIdentityProvidersName Remove one `identity-providers:` definition — refused while another config section still references it by bare name
+//
+// Corresponds with DELETE /api/v1/admin/identity-providers/{name} (the `DeleteIdentityProvidersName` operationId).
+func (c *Client) DeleteIdentityProvidersName(ctx context.Context, name string, params *DeleteIdentityProvidersNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteIdentityProvidersNameRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetIdentityProvidersName One `identity-providers:` definition
+//
+// Corresponds with GET /api/v1/admin/identity-providers/{name} (the `GetIdentityProvidersName` operationId).
+func (c *Client) GetIdentityProvidersName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetIdentityProvidersNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutIdentityProvidersNameWithBody Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+func (c *Client) PutIdentityProvidersNameWithBody(ctx context.Context, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutIdentityProvidersNameRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutIdentityProvidersName Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+func (c *Client) PutIdentityProvidersName(ctx context.Context, name string, params *PutIdentityProvidersNameParams, body PutIdentityProvidersNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutIdentityProvidersNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchIdentityProvidersNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+func (c *Client) PatchIdentityProvidersNameSettingsWithBody(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchIdentityProvidersNameSettingsRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchIdentityProvidersNameSettings Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+func (c *Client) PatchIdentityProvidersNameSettings(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, body PatchIdentityProvidersNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchIdentityProvidersNameSettingsRequest(c.Server, name, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3984,6 +4401,240 @@ func NewGetConfigVersionsVRequest(server string, v int) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetExportRequest constructs an http.Request for the GetExport method
+func NewGetExportRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/export")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteExportNameRequest constructs an http.Request for the DeleteExportName method
+func NewDeleteExportNameRequest(server string, name string, params *DeleteExportNameParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/export/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetExportNameRequest constructs an http.Request for the GetExportName method
+func NewGetExportNameRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/export/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutExportNameRequest calls the generic PutExportName builder with application/json body
+func NewPutExportNameRequest(server string, name string, params *PutExportNameParams, body PutExportNameJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutExportNameRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPutExportNameRequestWithBody constructs an http.Request for the PutExportName method, with any body, and a specified content type
+func NewPutExportNameRequestWithBody(server string, name string, params *PutExportNameParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/export/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewPatchExportNameSettingsRequest calls the generic PatchExportNameSettings builder with application/json body
+func NewPatchExportNameSettingsRequest(server string, name string, params *PatchExportNameSettingsParams, body PatchExportNameSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchExportNameSettingsRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPatchExportNameSettingsRequestWithBody constructs an http.Request for the PatchExportNameSettings method, with any body, and a specified content type
+func NewPatchExportNameSettingsRequestWithBody(server string, name string, params *PatchExportNameSettingsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/export/%s/settings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetGroupsRequest constructs an http.Request for the GetGroups method
 func NewGetGroupsRequest(server string) (*http.Request, error) {
 	var err error
@@ -4693,6 +5344,240 @@ func NewGetHooksNameStatusRequest(server string, name string) (*http.Request, er
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetIdentityProvidersRequest constructs an http.Request for the GetIdentityProviders method
+func NewGetIdentityProvidersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/identity-providers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteIdentityProvidersNameRequest constructs an http.Request for the DeleteIdentityProvidersName method
+func NewDeleteIdentityProvidersNameRequest(server string, name string, params *DeleteIdentityProvidersNameParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/identity-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetIdentityProvidersNameRequest constructs an http.Request for the GetIdentityProvidersName method
+func NewGetIdentityProvidersNameRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/identity-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutIdentityProvidersNameRequest calls the generic PutIdentityProvidersName builder with application/json body
+func NewPutIdentityProvidersNameRequest(server string, name string, params *PutIdentityProvidersNameParams, body PutIdentityProvidersNameJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutIdentityProvidersNameRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPutIdentityProvidersNameRequestWithBody constructs an http.Request for the PutIdentityProvidersName method, with any body, and a specified content type
+func NewPutIdentityProvidersNameRequestWithBody(server string, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/identity-providers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewPatchIdentityProvidersNameSettingsRequest calls the generic PatchIdentityProvidersNameSettings builder with application/json body
+func NewPatchIdentityProvidersNameSettingsRequest(server string, name string, params *PatchIdentityProvidersNameSettingsParams, body PatchIdentityProvidersNameSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchIdentityProvidersNameSettingsRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPatchIdentityProvidersNameSettingsRequestWithBody constructs an http.Request for the PatchIdentityProvidersNameSettings method, with any body, and a specified content type
+func NewPatchIdentityProvidersNameSettingsRequestWithBody(server string, name string, params *PatchIdentityProvidersNameSettingsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/identity-providers/%s/settings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
 	}
 
 	return req, nil
@@ -5936,6 +6821,55 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/config/versions/{v} (the `GetConfigVersionsV` operationId).
 	GetConfigVersionsVWithResponse(ctx context.Context, v int, reqEditors ...RequestEditorFn) (*GetConfigVersionsVResponse, error)
 
+	// GetExportWithResponse Every `export:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/export (the `GetExport` operationId).
+	GetExportWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetExportResponse, error)
+
+	// DeleteExportNameWithResponse Remove one `export:` definition — refused while another config section still references it by bare name
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/admin/export/{name} (the `DeleteExportName` operationId).
+	DeleteExportNameWithResponse(ctx context.Context, name string, params *DeleteExportNameParams, reqEditors ...RequestEditorFn) (*DeleteExportNameResponse, error)
+
+	// GetExportNameWithResponse One `export:` definition
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/export/{name} (the `GetExportName` operationId).
+	GetExportNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetExportNameResponse, error)
+
+	// PutExportNameWithBodyWithResponse Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+	PutExportNameWithBodyWithResponse(ctx context.Context, name string, params *PutExportNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutExportNameResponse, error)
+
+	// PutExportNameWithResponse Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+	PutExportNameWithResponse(ctx context.Context, name string, params *PutExportNameParams, body PutExportNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutExportNameResponse, error)
+
+	// PatchExportNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+	PatchExportNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchExportNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchExportNameSettingsResponse, error)
+
+	// PatchExportNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+	PatchExportNameSettingsWithResponse(ctx context.Context, name string, params *PatchExportNameSettingsParams, body PatchExportNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchExportNameSettingsResponse, error)
+
 	// GetGroupsWithResponse Group registry — the limit tree (parent chain, limits, child_default budget template)
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -6089,6 +7023,55 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with GET /api/v1/admin/hooks/{name}/status (the `GetHooksNameStatus` operationId).
 	GetHooksNameStatusWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetHooksNameStatusResponse, error)
+
+	// GetIdentityProvidersWithResponse Every `identity-providers:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/identity-providers (the `GetIdentityProviders` operationId).
+	GetIdentityProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetIdentityProvidersResponse, error)
+
+	// DeleteIdentityProvidersNameWithResponse Remove one `identity-providers:` definition — refused while another config section still references it by bare name
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/admin/identity-providers/{name} (the `DeleteIdentityProvidersName` operationId).
+	DeleteIdentityProvidersNameWithResponse(ctx context.Context, name string, params *DeleteIdentityProvidersNameParams, reqEditors ...RequestEditorFn) (*DeleteIdentityProvidersNameResponse, error)
+
+	// GetIdentityProvidersNameWithResponse One `identity-providers:` definition
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/identity-providers/{name} (the `GetIdentityProvidersName` operationId).
+	GetIdentityProvidersNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetIdentityProvidersNameResponse, error)
+
+	// PutIdentityProvidersNameWithBodyWithResponse Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+	PutIdentityProvidersNameWithBodyWithResponse(ctx context.Context, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutIdentityProvidersNameResponse, error)
+
+	// PutIdentityProvidersNameWithResponse Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+	PutIdentityProvidersNameWithResponse(ctx context.Context, name string, params *PutIdentityProvidersNameParams, body PutIdentityProvidersNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutIdentityProvidersNameResponse, error)
+
+	// PatchIdentityProvidersNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+	PatchIdentityProvidersNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchIdentityProvidersNameSettingsResponse, error)
+
+	// PatchIdentityProvidersNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+	PatchIdentityProvidersNameSettingsWithResponse(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, body PatchIdentityProvidersNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchIdentityProvidersNameSettingsResponse, error)
 
 	// GetInfoWithResponse Version, compiled-in plugin proof, uptime, topology
 	//
@@ -7413,6 +8396,393 @@ func (r GetConfigVersionsVResponse) ContentType() string {
 	return ""
 }
 
+type GetExportResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageNamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExportResponse) GetJSON200() *PageNamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetExportResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetExportResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetExportResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExportResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExportResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExportResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExportResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteExportNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteExportNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteExportNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteExportNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteExportNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteExportNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteExportNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteExportNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteExportNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteExportNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteExportNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteExportNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetExportNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetExportNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetExportNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetExportNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetExportNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetExportNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetExportNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetExportNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetExportNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetExportNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutExportNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutExportNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutExportNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PutExportNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PutExportNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PutExportNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutExportNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PutExportNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutExportNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutExportNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutExportNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutExportNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchExportNameSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchExportNameSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchExportNameSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchExportNameSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchExportNameSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetGroupsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8651,6 +10021,393 @@ func (r GetHooksNameStatusResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r GetHooksNameStatusResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetIdentityProvidersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageNamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetIdentityProvidersResponse) GetJSON200() *PageNamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetIdentityProvidersResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetIdentityProvidersResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetIdentityProvidersResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetIdentityProvidersResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetIdentityProvidersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetIdentityProvidersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetIdentityProvidersResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteIdentityProvidersNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteIdentityProvidersNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteIdentityProvidersNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteIdentityProvidersNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteIdentityProvidersNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetIdentityProvidersNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetIdentityProvidersNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetIdentityProvidersNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetIdentityProvidersNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetIdentityProvidersNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetIdentityProvidersNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetIdentityProvidersNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetIdentityProvidersNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetIdentityProvidersNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetIdentityProvidersNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutIdentityProvidersNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutIdentityProvidersNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutIdentityProvidersNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutIdentityProvidersNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutIdentityProvidersNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchIdentityProvidersNameSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchIdentityProvidersNameSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchIdentityProvidersNameSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchIdentityProvidersNameSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchIdentityProvidersNameSettingsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10816,6 +12573,97 @@ func (c *ClientWithResponses) GetConfigVersionsVWithResponse(ctx context.Context
 	return ParseGetConfigVersionsVResponse(rsp)
 }
 
+// GetExportWithResponse Every `export:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/export (the `GetExport` operationId).
+func (c *ClientWithResponses) GetExportWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetExportResponse, error) {
+	rsp, err := c.GetExport(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExportResponse(rsp)
+}
+
+// DeleteExportNameWithResponse Remove one `export:` definition — refused while another config section still references it by bare name
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/admin/export/{name} (the `DeleteExportName` operationId).
+func (c *ClientWithResponses) DeleteExportNameWithResponse(ctx context.Context, name string, params *DeleteExportNameParams, reqEditors ...RequestEditorFn) (*DeleteExportNameResponse, error) {
+	rsp, err := c.DeleteExportName(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteExportNameResponse(rsp)
+}
+
+// GetExportNameWithResponse One `export:` definition
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/export/{name} (the `GetExportName` operationId).
+func (c *ClientWithResponses) GetExportNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetExportNameResponse, error) {
+	rsp, err := c.GetExportName(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetExportNameResponse(rsp)
+}
+
+// PutExportNameWithBodyWithResponse Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+func (c *ClientWithResponses) PutExportNameWithBodyWithResponse(ctx context.Context, name string, params *PutExportNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutExportNameResponse, error) {
+	rsp, err := c.PutExportNameWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutExportNameResponse(rsp)
+}
+
+// PutExportNameWithResponse Create or REPLACE one `export:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
+func (c *ClientWithResponses) PutExportNameWithResponse(ctx context.Context, name string, params *PutExportNameParams, body PutExportNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutExportNameResponse, error) {
+	rsp, err := c.PutExportName(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutExportNameResponse(rsp)
+}
+
+// PatchExportNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+func (c *ClientWithResponses) PatchExportNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchExportNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchExportNameSettingsResponse, error) {
+	rsp, err := c.PatchExportNameSettingsWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchExportNameSettingsResponse(rsp)
+}
+
+// PatchExportNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `export:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/export/{name}/settings (the `PatchExportNameSettings` operationId).
+func (c *ClientWithResponses) PatchExportNameSettingsWithResponse(ctx context.Context, name string, params *PatchExportNameSettingsParams, body PatchExportNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchExportNameSettingsResponse, error) {
+	rsp, err := c.PatchExportNameSettings(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchExportNameSettingsResponse(rsp)
+}
+
 // GetGroupsWithResponse Group registry — the limit tree (parent chain, limits, child_default budget template)
 //
 // Returns a wrapper object for the known response body format(s).
@@ -11100,6 +12948,97 @@ func (c *ClientWithResponses) GetHooksNameStatusWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseGetHooksNameStatusResponse(rsp)
+}
+
+// GetIdentityProvidersWithResponse Every `identity-providers:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/identity-providers (the `GetIdentityProviders` operationId).
+func (c *ClientWithResponses) GetIdentityProvidersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetIdentityProvidersResponse, error) {
+	rsp, err := c.GetIdentityProviders(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetIdentityProvidersResponse(rsp)
+}
+
+// DeleteIdentityProvidersNameWithResponse Remove one `identity-providers:` definition — refused while another config section still references it by bare name
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/admin/identity-providers/{name} (the `DeleteIdentityProvidersName` operationId).
+func (c *ClientWithResponses) DeleteIdentityProvidersNameWithResponse(ctx context.Context, name string, params *DeleteIdentityProvidersNameParams, reqEditors ...RequestEditorFn) (*DeleteIdentityProvidersNameResponse, error) {
+	rsp, err := c.DeleteIdentityProvidersName(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteIdentityProvidersNameResponse(rsp)
+}
+
+// GetIdentityProvidersNameWithResponse One `identity-providers:` definition
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/identity-providers/{name} (the `GetIdentityProvidersName` operationId).
+func (c *ClientWithResponses) GetIdentityProvidersNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetIdentityProvidersNameResponse, error) {
+	rsp, err := c.GetIdentityProvidersName(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetIdentityProvidersNameResponse(rsp)
+}
+
+// PutIdentityProvidersNameWithBodyWithResponse Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+func (c *ClientWithResponses) PutIdentityProvidersNameWithBodyWithResponse(ctx context.Context, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutIdentityProvidersNameResponse, error) {
+	rsp, err := c.PutIdentityProvidersNameWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutIdentityProvidersNameResponse(rsp)
+}
+
+// PutIdentityProvidersNameWithResponse Create or REPLACE one `identity-providers:` definition (upsert) — persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
+func (c *ClientWithResponses) PutIdentityProvidersNameWithResponse(ctx context.Context, name string, params *PutIdentityProvidersNameParams, body PutIdentityProvidersNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutIdentityProvidersNameResponse, error) {
+	rsp, err := c.PutIdentityProvidersName(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutIdentityProvidersNameResponse(rsp)
+}
+
+// PatchIdentityProvidersNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+func (c *ClientWithResponses) PatchIdentityProvidersNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchIdentityProvidersNameSettingsResponse, error) {
+	rsp, err := c.PatchIdentityProvidersNameSettingsWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchIdentityProvidersNameSettingsResponse(rsp)
+}
+
+// PatchIdentityProvidersNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `identity-providers:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/identity-providers/{name}/settings (the `PatchIdentityProvidersNameSettings` operationId).
+func (c *ClientWithResponses) PatchIdentityProvidersNameSettingsWithResponse(ctx context.Context, name string, params *PatchIdentityProvidersNameSettingsParams, body PatchIdentityProvidersNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchIdentityProvidersNameSettingsResponse, error) {
+	rsp, err := c.PatchIdentityProvidersNameSettings(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchIdentityProvidersNameSettingsResponse(rsp)
 }
 
 // GetInfoWithResponse Version, compiled-in plugin proof, uptime, topology
@@ -12385,6 +14324,321 @@ func ParseGetConfigVersionsVResponse(rsp *http.Response) (*GetConfigVersionsVRes
 	return response, nil
 }
 
+// ParseGetExportResponse parses an HTTP response from a GetExportWithResponse call
+func ParseGetExportResponse(rsp *http.Response) (*GetExportResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExportResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageNamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteExportNameResponse parses an HTTP response from a DeleteExportNameWithResponse call
+func ParseDeleteExportNameResponse(rsp *http.Response) (*DeleteExportNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteExportNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetExportNameResponse parses an HTTP response from a GetExportNameWithResponse call
+func ParseGetExportNameResponse(rsp *http.Response) (*GetExportNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetExportNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutExportNameResponse parses an HTTP response from a PutExportNameWithResponse call
+func ParsePutExportNameResponse(rsp *http.Response) (*PutExportNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutExportNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchExportNameSettingsResponse parses an HTTP response from a PatchExportNameSettingsWithResponse call
+func ParsePatchExportNameSettingsResponse(rsp *http.Response) (*PatchExportNameSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchExportNameSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetGroupsResponse parses an HTTP response from a GetGroupsWithResponse call
 func ParseGetGroupsResponse(rsp *http.Response) (*GetGroupsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -13382,6 +15636,321 @@ func ParseGetHooksNameStatusResponse(rsp *http.Response) (*GetHooksNameStatusRes
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetIdentityProvidersResponse parses an HTTP response from a GetIdentityProvidersWithResponse call
+func ParseGetIdentityProvidersResponse(rsp *http.Response) (*GetIdentityProvidersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetIdentityProvidersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageNamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteIdentityProvidersNameResponse parses an HTTP response from a DeleteIdentityProvidersNameWithResponse call
+func ParseDeleteIdentityProvidersNameResponse(rsp *http.Response) (*DeleteIdentityProvidersNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteIdentityProvidersNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetIdentityProvidersNameResponse parses an HTTP response from a GetIdentityProvidersNameWithResponse call
+func ParseGetIdentityProvidersNameResponse(rsp *http.Response) (*GetIdentityProvidersNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetIdentityProvidersNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutIdentityProvidersNameResponse parses an HTTP response from a PutIdentityProvidersNameWithResponse call
+func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (*PutIdentityProvidersNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutIdentityProvidersNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchIdentityProvidersNameSettingsResponse parses an HTTP response from a PatchIdentityProvidersNameSettingsWithResponse call
+func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (*PatchIdentityProvidersNameSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchIdentityProvidersNameSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
