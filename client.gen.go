@@ -831,12 +831,17 @@ type ModelView struct {
 // Deliberately ONE view for every section rather than one per kind: the sections share the frozen
 // `{module, settings}` spine and differ only by optional kind-specific fields, which are
 // `skip_serializing_if`-omitted for a section that has none. So `/export` serves exactly
-// `{name, module, settings}` while `/identity-providers` additionally carries its ceiling — and a
-// new section adds fields here (additive) instead of a parallel view + a parallel handler.
+// `{name, module, settings_keys}` while `/identity-providers` additionally carries its ceiling —
+// and a new section adds fields here (additive) instead of a parallel view + a parallel handler.
 //
-// SECRETS ARE NEVER PROJECTED, by construction: an `identity-providers.<name>.token:` is a SECRET
-// REFERENCE, and this view reports only WHETHER one is configured — there is no field the reference
-// (let alone a resolved value) could ride out on.
+// SECRETS ARE NEVER PROJECTED, by construction — and that claim covers the `settings:` bag too,
+// which is why this view carries `settings_keys` and NOT the bag itself. A `token:` is a SECRET
+// REFERENCE collapsed to a boolean, and the module's opaque settings are a bag an operator
+// legitimately puts a credential VALUE in (an OIDC `client_secret`, a webhook `auth_header` value),
+// so projecting it verbatim would hand every READ-ONLY admin credential the deployment's secrets
+// through `GET /identity-providers/{name}` / `GET /export/{name}`. Projecting the KEY NAMES keeps
+// the introspection the read surface exists for ("what is configured here?") with no field a value
+// could ride out on — the same discipline `token_configured` already applies to the reference.
 type NamedDefView struct {
 	// BrowserLoginConfigured `identity-providers` ONLY: whether a `browser_login:` block is configured — the presence that
 	// puts a button on the hosted login page.
@@ -853,8 +858,12 @@ type NamedDefView struct {
 	// Name The instance NAME — the map key, and the token every reference site uses.
 	Name string `json:"name"`
 
-	// Settings The module's opaque settings bag, verbatim. Operator/API-owned; never interpreted here.
-	Settings map[string]interface{} `json:"settings"`
+	// SettingsKeys The KEY NAMES of the module's opaque settings bag, sorted, WITHOUT their values — the
+	// redacted projection of `settings:`. Operator/API-owned and never interpreted here, but also
+	// never a place a VALUE can leak from: a settings value may be a credential (see the type doc),
+	// and this surface is reachable at READ-ONLY admin scope. An empty bag ⇒ an empty list. The
+	// values are readable only where they are writable — the config file and the config overlay.
+	SettingsKeys []string `json:"settings_keys"`
 
 	// TokenConfigured `identity-providers` ONLY: whether a `token:` secret REFERENCE is configured (the built-in
 	// `admin-tokens` operator credential). The reference itself is never projected.
