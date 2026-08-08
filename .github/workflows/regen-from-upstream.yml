@@ -1,8 +1,15 @@
-# Keeps `main` continuously synced with busbarAI's `dev` branch OpenAPI spec, so
-# this SDK never strands again the way it did at 1.4.0 (see busbar-ui's
+# Keeps busbar-go's `dev` branch continuously synced with busbarAI's `dev` branch OpenAPI
+# spec, so this SDK never strands again the way it did at 1.4.0 (see busbar-ui's
 # ENGINE-BUGS.md E-006). Polls the upstream spec file, and when it changes,
 # regenerates the client, proves it builds + vets clean, and pushes straight
-# to `main` on green. A no-op (clean exit) if the spec is unchanged.
+# to `dev` on green. A no-op (clean exit) if the spec is unchanged.
+#
+# Deliberately does NOT touch `main`. `main` is the released-SDK branch, protected,
+# advanced only by a reviewed PR at an actual release cut (see RELEASING.md) — never by
+# this bot. Pushing continuous sync noise to a protected branch via the bot identity
+# (GITHUB_TOKEN) doesn't work anyway (it isn't a repo admin, so branch protection's
+# required-review rule blocks it, same as any non-admin contributor); `dev` has no such
+# protection, which is the whole point of the split.
 #
 # Why polling (not a push-triggered repository_dispatch from busbar's own CI):
 # busbar-go doesn't control GetBusbar/busbar's workflows, so wiring a dispatch
@@ -28,7 +35,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write # commit the regenerated client + push to main
+  contents: write # commit the regenerated client + push to dev
 
 env:
   UPSTREAM_RAW_URL: https://raw.githubusercontent.com/GetBusbar/busbar/dev/crates/busbar/src/admin/v1/json/openapi.json
@@ -40,6 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: dev
           fetch-depth: 0
 
       - uses: actions/setup-go@v5
@@ -97,7 +105,7 @@ jobs:
           GetBusbar/busbar@${UPSTREAM_SHA}. Regenerated client.gen.go via 'make generate'
           and verified with 'make verify' (build + vet) before pushing.
 
-          This is a dev-tracking sync, not a release — no version tag is cut here.
-          See RELEASING.md for how tagging works."
-          git push origin HEAD:main
-          echo "::notice::synced busbar-go main to busbar dev@${UPSTREAM_SHORT} (spec ${new_version})"
+          This is a dev-tracking sync, not a release — no version tag is cut here, and
+          this never touches main. See RELEASING.md for how tagging/release works."
+          git push origin HEAD:dev
+          echo "::notice::synced busbar-go dev to busbar dev@${UPSTREAM_SHORT} (spec ${new_version})"
