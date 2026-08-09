@@ -856,6 +856,75 @@ type LimitView struct {
 	Pool *string `json:"pool,omitempty"`
 }
 
+// McpCapabilityView ONE CAPABILITY'S STANDING STATUS, the three-way answer a trust view has to render.
+//
+// Three and not two: `approved at a digest`, `rejected`, and `allowed but never ruled on`. The
+// third is `pending` and it is the one a queue exists to drain, so collapsing it into "not
+// approved" would hide the operator's whole worklist.
+type McpCapabilityView struct {
+	// ApprovedDigest The digest the operator approved, when there is one. A rejected or pending capability has
+	// none, and reporting the last OBSERVED digest here would read as an approval.
+	ApprovedDigest *string `json:"approved_digest"`
+
+	// Status `approved`, `rejected` or `pending`.
+	Status string `json:"status"`
+
+	// Tool The bare tool name, as the upstream spells it.
+	Tool string `json:"tool"`
+}
+
+// McpHealthView THE HEALTH VIEW — `GET /tools/{name}/health`. Deliberately smaller than the trust view: health
+// answers "can busbar use this server right now, and if not why", and a dashboard polling it should
+// not be re-rendering the whole changes queue to find out.
+type McpHealthView struct {
+	// Contacted `false` until a refresh has ever landed. A server that has never been contacted is not
+	// unhealthy, and reporting it as such would page somebody for a declarative deployment.
+	Contacted     bool    `json:"contacted"`
+	Failure       *string `json:"failure"`
+	Name          string  `json:"name"`
+	ObservedTools uint    `json:"observed_tools"`
+
+	// Serving Whether this server currently SERVES: `state == approved`. Named separately from `state`
+	// because it is the one bit a caller usually wants and deriving it from a word is how a client
+	// ends up hard-coding a spelling.
+	Serving bool   `json:"serving"`
+	State   string `json:"state"`
+}
+
+// McpTrustView THE TRUST VIEW of one registered MCP server — `POST /tools/{name}/connect` and
+// `GET /tools/{name}/changes` answer with this.
+type McpTrustView struct {
+	// Added Offered now, never ruled on.
+	Added []string `json:"added"`
+
+	// Capabilities Every capability's standing status, in name order.
+	Capabilities []McpCapabilityView `json:"capabilities"`
+
+	// Changed Approved, but offered at a DIFFERENT digest. THIS IS THE RUG-PULL ROW.
+	Changed []string `json:"changed"`
+
+	// Failure Why the last contact failed, when it did.
+	Failure *string `json:"failure"`
+	Name    string  `json:"name"`
+
+	// ObservedTools How many tools the last successful observation carried.
+	ObservedTools uint `json:"observed_tools"`
+
+	// PinChanged The presented identity is not the locked one. Its own axis: adopting a new identity is a
+	// different act from adopting new content.
+	PinChanged bool `json:"pin_changed"`
+
+	// PinMechanism The operator's word for the authenticity root. Never interpreted by the machine.
+	PinMechanism string `json:"pin_mechanism"`
+
+	// Removed Approved, and no longer offered.
+	Removed []string `json:"removed"`
+
+	// State `pending`, `approved`, `quarantined`, `suspended` or `error`. DERIVED from the approval and
+	// the last sighting on every read, so there is no stored state to go stale.
+	State string `json:"state"`
+}
+
 // ModelUsageView One (model, provider) row of the per-model aggregation.
 type ModelUsageView struct {
 	Model    string `json:"model"`
@@ -2530,6 +2599,21 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
 	PutToolsName(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetToolsNameChanges The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+	GetToolsNameChanges(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostToolsNameConnect Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+	//
+	// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+	PostToolsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolsNameHealth Whether one MCP server currently serves, and why not when it does not
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+	GetToolsNameHealth(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// PatchToolsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
 	//
 	// Takes any type of body and a specified content type.
@@ -4125,6 +4209,51 @@ func (c *Client) PutToolsNameWithBody(ctx context.Context, name string, params *
 // Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
 func (c *Client) PutToolsName(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutToolsNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolsNameChanges The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+func (c *Client) GetToolsNameChanges(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsNameChangesRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostToolsNameConnect Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+//
+// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+func (c *Client) PostToolsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostToolsNameConnectRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolsNameHealth Whether one MCP server currently serves, and why not when it does not
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+func (c *Client) GetToolsNameHealth(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsNameHealthRequest(c.Server, name)
 	if err != nil {
 		return nil, err
 	}
@@ -7448,6 +7577,108 @@ func NewPutToolsNameRequestWithBody(server string, name string, params *PutTools
 	return req, nil
 }
 
+// NewGetToolsNameChangesRequest constructs an http.Request for the GetToolsNameChanges method
+func NewGetToolsNameChangesRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/changes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostToolsNameConnectRequest constructs an http.Request for the PostToolsNameConnect method
+func NewPostToolsNameConnectRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/connect", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetToolsNameHealthRequest constructs an http.Request for the GetToolsNameHealth method
+func NewGetToolsNameHealthRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/health", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewPatchToolsNameSettingsRequest calls the generic PatchToolsNameSettings builder with application/json body
 func NewPatchToolsNameSettingsRequest(server string, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -8300,6 +8531,27 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
 	PutToolsNameWithResponse(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error)
+
+	// GetToolsNameChangesWithResponse The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+	GetToolsNameChangesWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameChangesResponse, error)
+
+	// PostToolsNameConnectWithResponse Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+	PostToolsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostToolsNameConnectResponse, error)
+
+	// GetToolsNameHealthWithResponse Whether one MCP server currently serves, and why not when it does not
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+	GetToolsNameHealthWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameHealthResponse, error)
 
 	// PatchToolsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
 	//
@@ -13947,6 +14199,227 @@ func (r PutToolsNameResponse) ContentType() string {
 	return ""
 }
 
+type GetToolsNameChangesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *McpTrustView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON200() *McpTrustView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsNameChangesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsNameChangesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsNameChangesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsNameChangesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostToolsNameConnectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *McpTrustView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON200() *McpTrustView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostToolsNameConnectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostToolsNameConnectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostToolsNameConnectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostToolsNameConnectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetToolsNameHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *McpHealthView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON200() *McpHealthView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsNameHealthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsNameHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsNameHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsNameHealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type PatchToolsNameSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -15391,6 +15864,45 @@ func (c *ClientWithResponses) PutToolsNameWithResponse(ctx context.Context, name
 		return nil, err
 	}
 	return ParsePutToolsNameResponse(rsp)
+}
+
+// GetToolsNameChangesWithResponse The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+func (c *ClientWithResponses) GetToolsNameChangesWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameChangesResponse, error) {
+	rsp, err := c.GetToolsNameChanges(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsNameChangesResponse(rsp)
+}
+
+// PostToolsNameConnectWithResponse Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+func (c *ClientWithResponses) PostToolsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostToolsNameConnectResponse, error) {
+	rsp, err := c.PostToolsNameConnect(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostToolsNameConnectResponse(rsp)
+}
+
+// GetToolsNameHealthWithResponse Whether one MCP server currently serves, and why not when it does not
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+func (c *ClientWithResponses) GetToolsNameHealthWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameHealthResponse, error) {
+	rsp, err := c.GetToolsNameHealth(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsNameHealthResponse(rsp)
 }
 
 // PatchToolsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
@@ -19957,6 +20469,182 @@ func ParsePutToolsNameResponse(rsp *http.Response) (*PutToolsNameResponse, error
 			return nil, err
 		}
 		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsNameChangesResponse parses an HTTP response from a GetToolsNameChangesWithResponse call
+func ParseGetToolsNameChangesResponse(rsp *http.Response) (*GetToolsNameChangesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsNameChangesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest McpTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostToolsNameConnectResponse parses an HTTP response from a PostToolsNameConnectWithResponse call
+func ParsePostToolsNameConnectResponse(rsp *http.Response) (*PostToolsNameConnectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostToolsNameConnectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest McpTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsNameHealthResponse parses an HTTP response from a GetToolsNameHealthWithResponse call
+func ParseGetToolsNameHealthResponse(rsp *http.Response) (*GetToolsNameHealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsNameHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest McpHealthView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
