@@ -57,18 +57,24 @@ func (e ErrorErrorCode) Valid() bool {
 
 // Defines values for DeleteOverlaySectionParamsSection.
 const (
-	Groups         DeleteOverlaySectionParamsSection = "groups"
-	Hooks          DeleteOverlaySectionParamsSection = "hooks"
-	PluginVersions DeleteOverlaySectionParamsSection = "plugin_versions"
-	Root           DeleteOverlaySectionParamsSection = "root"
+	Export            DeleteOverlaySectionParamsSection = "export"
+	Groups            DeleteOverlaySectionParamsSection = "groups"
+	Hooks             DeleteOverlaySectionParamsSection = "hooks"
+	IdentityProviders DeleteOverlaySectionParamsSection = "identity-providers"
+	PluginVersions    DeleteOverlaySectionParamsSection = "plugin_versions"
+	Root              DeleteOverlaySectionParamsSection = "root"
 )
 
 // Valid indicates whether the value is a known member of the DeleteOverlaySectionParamsSection enum.
 func (e DeleteOverlaySectionParamsSection) Valid() bool {
 	switch e {
+	case Export:
+		return true
 	case Groups:
 		return true
 	case Hooks:
+		return true
+	case IdentityProviders:
 		return true
 	case PluginVersions:
 		return true
@@ -941,7 +947,9 @@ type OverlayResetView struct {
 	Changed       bool   `json:"changed"`
 	ConfigVersion uint64 `json:"config_version"`
 
-	// Reset The section that was reset (`groups` | `hooks` | `root` | `plugin_versions`).
+	// Reset The section that was reset. This endpoint's `section` path parameter enumerates the valid
+	// set; it is deliberately not restated here, because the hand-written copy that used to sit on
+	// this line went stale the moment a section was added.
 	Reset string `json:"reset"`
 }
 
@@ -2267,7 +2275,7 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/openapi.json (the `GetOpenapiJson` operationId).
 	GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+	// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 	//
 	// Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 	DeleteOverlaySection(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -3496,7 +3504,7 @@ func (c *Client) GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditor
 	return c.Client.Do(req)
 }
 
-// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 //
 // Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 func (c *Client) DeleteOverlaySection(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -7228,7 +7236,7 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/openapi.json (the `GetOpenapiJson` operationId).
 	GetOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiJsonResponse, error)
 
-	// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+	// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -13274,7 +13282,7 @@ func (c *ClientWithResponses) GetOpenapiJsonWithResponse(ctx context.Context, re
 	return ParseGetOpenapiJsonResponse(rsp)
 }
 
-// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 //
 // Returns a wrapper object for the known response body format(s).
 //
