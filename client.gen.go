@@ -57,17 +57,21 @@ func (e ErrorErrorCode) Valid() bool {
 
 // Defines values for DeleteOverlaySectionParamsSection.
 const (
+	Agents            DeleteOverlaySectionParamsSection = "agents"
 	Export            DeleteOverlaySectionParamsSection = "export"
 	Groups            DeleteOverlaySectionParamsSection = "groups"
 	Hooks             DeleteOverlaySectionParamsSection = "hooks"
 	IdentityProviders DeleteOverlaySectionParamsSection = "identity-providers"
 	PluginVersions    DeleteOverlaySectionParamsSection = "plugin_versions"
 	Root              DeleteOverlaySectionParamsSection = "root"
+	Tools             DeleteOverlaySectionParamsSection = "tools"
 )
 
 // Valid indicates whether the value is a known member of the DeleteOverlaySectionParamsSection enum.
 func (e DeleteOverlaySectionParamsSection) Valid() bool {
 	switch e {
+	case Agents:
+		return true
 	case Export:
 		return true
 	case Groups:
@@ -79,6 +83,8 @@ func (e DeleteOverlaySectionParamsSection) Valid() bool {
 	case PluginVersions:
 		return true
 	case Root:
+		return true
+	case Tools:
 		return true
 	default:
 		return false
@@ -901,16 +907,38 @@ type NamedDefView struct {
 	// puts a button on the hosted login page.
 	BrowserLoginConfigured *bool `json:"browser_login_configured,omitempty"`
 
+	// FingerprintPinned `agents` ONLY: whether an approved card FINGERPRINT is pinned yet. A registration with a
+	// root but no fingerprint is the normal state of a fresh entry awaiting approval, and it is
+	// the state an operator most needs to be able to see.
+	FingerprintPinned *bool `json:"fingerprint_pinned,omitempty"`
+
 	// MaxAdminScope `identity-providers` ONLY: the per-provider ADMIN CEILING (`none` | `read-only` | `full`).
 	// `None` ⇒ the definition names none, so the most restrictive default applies. Omitted entirely
 	// for a section that carries no ceiling.
 	MaxAdminScope *string `json:"max_admin_scope,omitempty"`
 
 	// Module The `module:` backing this instance (a built-in name or a signed-plugin name/alias).
-	Module string `json:"module"`
+	//
+	// OMITTED, not empty-stringed, for a section whose entries are not plugin instances -- today
+	// `agents:`, whose entries describe endpoints somebody else runs
+	// ([`NamedMapSection::requires_module`](crate::config::named_map::NamedMapSection::requires_module)).
+	// Every section that HAS a module requires it to be non-empty, so this can never be omitted
+	// for one that does.
+	Module *string `json:"module,omitempty"`
 
 	// Name The instance NAME: the map key, and the token every reference site uses.
 	Name string `json:"name"`
+
+	// PinMechanism `agents` ONLY: which authenticity root this registration is pinned to (`jws_issuer_key` |
+	// `cert_spki` | `mtls` | `unpinned`). Projected because an operator scanning a registration
+	// list needs to SEE which entries have no root; a mechanism that could only be discovered by
+	// reading the config file is a mechanism nobody audits.
+	PinMechanism *string `json:"pin_mechanism,omitempty"`
+
+	// ReverifyTtl `agents` ONLY: the re-verification cadence this registration carries, as written. The
+	// backend `url:` is deliberately NOT projected here: it is the real remote endpoint and is
+	// never client-visible.
+	ReverifyTtl *string `json:"reverify_ttl,omitempty"`
 
 	// SettingsKeys The KEY NAMES of the module's opaque settings bag, sorted, WITHOUT their values, the
 	// redacted projection of `settings:`. Operator/API-owned and never interpreted here, but also
@@ -1449,6 +1477,27 @@ type PutAdminAuthParams struct {
 	IfMatch *string `json:"If-Match,omitempty"`
 }
 
+// DeleteAgentsNameParams defines parameters for DeleteAgentsName.
+type DeleteAgentsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PutAgentsNameJSONBody defines parameters for PutAgentsName.
+type PutAgentsNameJSONBody map[string]interface{}
+
+// PutAgentsNameParams defines parameters for PutAgentsName.
+type PutAgentsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PatchAgentsNameSettingsParams defines parameters for PatchAgentsNameSettings.
+type PatchAgentsNameSettingsParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // GetAuditParams defines parameters for GetAudit.
 type GetAuditParams struct {
 	// Action Filter by exact action (e.g. `hook.register`)
@@ -1707,6 +1756,27 @@ type GetPoolsParams struct {
 	Detail *string `form:"detail,omitempty" json:"detail,omitempty"`
 }
 
+// DeleteToolsNameParams defines parameters for DeleteToolsName.
+type DeleteToolsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PutToolsNameJSONBody defines parameters for PutToolsName.
+type PutToolsNameJSONBody map[string]interface{}
+
+// PutToolsNameParams defines parameters for PutToolsName.
+type PutToolsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PatchToolsNameSettingsParams defines parameters for PatchToolsNameSettings.
+type PatchToolsNameSettingsParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // GetUsageParams defines parameters for GetUsage.
 type GetUsageParams struct {
 	// Window A PAST UTC-day bucket start epoch (default: current bucket). The response is always ONE bucket; spend_micros is a read-time estimate; bill from the raw token split, never store spend_micros as a ledger charge
@@ -1715,6 +1785,12 @@ type GetUsageParams struct {
 
 // PutAdminAuthJSONRequestBody defines body for PutAdminAuth for application/json ContentType.
 type PutAdminAuthJSONRequestBody = PutAuthBody
+
+// PutAgentsNameJSONRequestBody defines body for PutAgentsName for application/json ContentType.
+type PutAgentsNameJSONRequestBody PutAgentsNameJSONBody
+
+// PatchAgentsNameSettingsJSONRequestBody defines body for PatchAgentsNameSettings for application/json ContentType.
+type PatchAgentsNameSettingsJSONRequestBody = NamedSettingsReq
 
 // PostAuthCacheFlushJSONRequestBody defines body for PostAuthCacheFlush for application/json ContentType.
 type PostAuthCacheFlushJSONRequestBody = FlushCacheReq
@@ -1778,6 +1854,12 @@ type PostPluginsRollbackJSONRequestBody = PluginRollbackReq
 
 // PostRestartJSONRequestBody defines body for PostRestart for application/json ContentType.
 type PostRestartJSONRequestBody = RestartReq
+
+// PutToolsNameJSONRequestBody defines body for PutToolsName for application/json ContentType.
+type PutToolsNameJSONRequestBody PutToolsNameJSONBody
+
+// PatchToolsNameSettingsJSONRequestBody defines body for PatchToolsNameSettings for application/json ContentType.
+type PatchToolsNameSettingsJSONRequestBody = NamedSettingsReq
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -1871,6 +1953,49 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/admin/admin-auth (the `PutAdminAuth` operationId).
 	PutAdminAuth(ctx context.Context, params *PutAdminAuthParams, body PutAdminAuthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgents Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+	GetAgents(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteAgentsName Remove one `agents:` definition, refused while another config section still references it by bare name
+	//
+	// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+	DeleteAgentsName(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgentsName One `agents:` definition
+	//
+	// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+	GetAgentsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutAgentsNameWithBody Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsNameWithBody(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutAgentsName Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsName(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchAgentsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettingsWithBody(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchAgentsNameSettings Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettings(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAudit Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
 	//
@@ -2275,7 +2400,7 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/openapi.json (the `GetOpenapiJson` operationId).
 	GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+	// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 	//
 	// Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 	DeleteOverlaySection(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2376,6 +2501,49 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/admin/signing-key/rotate (the `PostSigningKeyRotate` operationId).
 	PostSigningKeyRotate(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetTools Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+	GetTools(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteToolsName Remove one `tools:` definition, refused while another config section still references it by bare name
+	//
+	// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+	DeleteToolsName(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolsName One `tools:` definition
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+	GetToolsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutToolsNameWithBody Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsNameWithBody(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutToolsName Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsName(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchToolsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettingsWithBody(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchToolsNameSettings Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettings(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetUsage Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 	//
 	// Corresponds with GET /api/v1/admin/usage (the `GetUsage` operationId).
@@ -2421,6 +2589,119 @@ func (c *Client) PutAdminAuthWithBody(ctx context.Context, params *PutAdminAuthP
 // Corresponds with PUT /api/v1/admin/admin-auth (the `PutAdminAuth` operationId).
 func (c *Client) PutAdminAuth(ctx context.Context, params *PutAdminAuthParams, body PutAdminAuthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutAdminAuthRequest(c.Server, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgents Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+func (c *Client) GetAgents(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteAgentsName Remove one `agents:` definition, refused while another config section still references it by bare name
+//
+// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+func (c *Client) DeleteAgentsName(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteAgentsNameRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgentsName One `agents:` definition
+//
+// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+func (c *Client) GetAgentsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentsNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutAgentsNameWithBody Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *Client) PutAgentsNameWithBody(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutAgentsNameRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutAgentsName Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *Client) PutAgentsName(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutAgentsNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchAgentsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *Client) PatchAgentsNameSettingsWithBody(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchAgentsNameSettingsRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchAgentsNameSettings Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *Client) PatchAgentsNameSettings(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchAgentsNameSettingsRequest(c.Server, name, params, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3504,7 +3785,7 @@ func (c *Client) GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditor
 	return c.Client.Do(req)
 }
 
-// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 //
 // Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 func (c *Client) DeleteOverlaySection(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3775,6 +4056,119 @@ func (c *Client) PostSigningKeyRotate(ctx context.Context, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
+// GetTools Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+func (c *Client) GetTools(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteToolsName Remove one `tools:` definition, refused while another config section still references it by bare name
+//
+// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+func (c *Client) DeleteToolsName(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteToolsNameRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolsName One `tools:` definition
+//
+// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+func (c *Client) GetToolsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutToolsNameWithBody Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *Client) PutToolsNameWithBody(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutToolsNameRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutToolsName Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *Client) PutToolsName(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutToolsNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchToolsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *Client) PatchToolsNameSettingsWithBody(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchToolsNameSettingsRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchToolsNameSettings Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *Client) PatchToolsNameSettings(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchToolsNameSettingsRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetUsage Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 //
 // Corresponds with GET /api/v1/admin/usage (the `GetUsage` operationId).
@@ -3848,6 +4242,240 @@ func NewPutAdminAuthRequestWithBody(server string, params *PutAdminAuthParams, c
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetAgentsRequest constructs an http.Request for the GetAgents method
+func NewGetAgentsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteAgentsNameRequest constructs an http.Request for the DeleteAgentsName method
+func NewDeleteAgentsNameRequest(server string, name string, params *DeleteAgentsNameParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetAgentsNameRequest constructs an http.Request for the GetAgentsName method
+func NewGetAgentsNameRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutAgentsNameRequest calls the generic PutAgentsName builder with application/json body
+func NewPutAgentsNameRequest(server string, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutAgentsNameRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPutAgentsNameRequestWithBody constructs an http.Request for the PutAgentsName method, with any body, and a specified content type
+func NewPutAgentsNameRequestWithBody(server string, name string, params *PutAgentsNameParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewPatchAgentsNameSettingsRequest calls the generic PatchAgentsNameSettings builder with application/json body
+func NewPatchAgentsNameSettingsRequest(server string, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchAgentsNameSettingsRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPatchAgentsNameSettingsRequestWithBody constructs an http.Request for the PatchAgentsNameSettings method, with any body, and a specified content type
+func NewPatchAgentsNameSettingsRequestWithBody(server string, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s/settings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -6648,6 +7276,240 @@ func NewPostSigningKeyRotateRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetToolsRequest constructs an http.Request for the GetTools method
+func NewGetToolsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteToolsNameRequest constructs an http.Request for the DeleteToolsName method
+func NewDeleteToolsNameRequest(server string, name string, params *DeleteToolsNameParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetToolsNameRequest constructs an http.Request for the GetToolsName method
+func NewGetToolsNameRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutToolsNameRequest calls the generic PutToolsName builder with application/json body
+func NewPutToolsNameRequest(server string, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutToolsNameRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPutToolsNameRequestWithBody constructs an http.Request for the PutToolsName method, with any body, and a specified content type
+func NewPutToolsNameRequestWithBody(server string, name string, params *PutToolsNameParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewPatchToolsNameSettingsRequest calls the generic PatchToolsNameSettings builder with application/json body
+func NewPatchToolsNameSettingsRequest(server string, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchToolsNameSettingsRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPatchToolsNameSettingsRequestWithBody constructs an http.Request for the PatchToolsNameSettings method, with any body, and a specified content type
+func NewPatchToolsNameSettingsRequestWithBody(server string, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/settings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
 // NewGetUsageRequest constructs an http.Request for the GetUsage method
 func NewGetUsageRequest(server string, params *GetUsageParams) (*http.Request, error) {
 	var err error
@@ -6766,6 +7628,55 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /api/v1/admin/admin-auth (the `PutAdminAuth` operationId).
 	PutAdminAuthWithResponse(ctx context.Context, params *PutAdminAuthParams, body PutAdminAuthJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAdminAuthResponse, error)
+
+	// GetAgentsWithResponse Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+	GetAgentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentsResponse, error)
+
+	// DeleteAgentsNameWithResponse Remove one `agents:` definition, refused while another config section still references it by bare name
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+	DeleteAgentsNameWithResponse(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*DeleteAgentsNameResponse, error)
+
+	// GetAgentsNameWithResponse One `agents:` definition
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+	GetAgentsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetAgentsNameResponse, error)
+
+	// PutAgentsNameWithBodyWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsNameWithBodyWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error)
+
+	// PutAgentsNameWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsNameWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error)
+
+	// PatchAgentsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error)
+
+	// PatchAgentsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettingsWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error)
 
 	// GetAuditWithResponse Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
 	//
@@ -7236,7 +8147,7 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/openapi.json (the `GetOpenapiJson` operationId).
 	GetOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiJsonResponse, error)
 
-	// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+	// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -7354,6 +8265,55 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/admin/signing-key/rotate (the `PostSigningKeyRotate` operationId).
 	PostSigningKeyRotateWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostSigningKeyRotateResponse, error)
+
+	// GetToolsWithResponse Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+	GetToolsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetToolsResponse, error)
+
+	// DeleteToolsNameWithResponse Remove one `tools:` definition, refused while another config section still references it by bare name
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+	DeleteToolsNameWithResponse(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*DeleteToolsNameResponse, error)
+
+	// GetToolsNameWithResponse One `tools:` definition
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+	GetToolsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameResponse, error)
+
+	// PutToolsNameWithBodyWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsNameWithBodyWithResponse(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error)
+
+	// PutToolsNameWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsNameWithResponse(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error)
+
+	// PatchToolsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error)
+
+	// PatchToolsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettingsWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error)
 
 	// GetUsageWithResponse Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 	//
@@ -7502,6 +8462,393 @@ func (r PutAdminAuthResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PutAdminAuthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAgentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageNamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentsResponse) GetJSON200() *PageNamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAgentsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetAgentsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetAgentsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteAgentsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteAgentsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteAgentsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteAgentsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAgentsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAgentsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetAgentsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetAgentsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetAgentsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutAgentsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutAgentsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutAgentsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PutAgentsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PutAgentsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PutAgentsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutAgentsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PutAgentsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutAgentsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutAgentsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutAgentsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchAgentsNameSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchAgentsNameSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchAgentsNameSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchAgentsNameSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchAgentsNameSettingsResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -12303,6 +13650,393 @@ func (r PostSigningKeyRotateResponse) ContentType() string {
 	return ""
 }
 
+type GetToolsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageNamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsResponse) GetJSON200() *PageNamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteToolsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteToolsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteToolsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteToolsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteToolsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetToolsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetToolsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutToolsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutToolsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutToolsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PutToolsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PutToolsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PutToolsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutToolsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PutToolsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutToolsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutToolsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutToolsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutToolsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchToolsNameSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchToolsNameSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchToolsNameSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchToolsNameSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchToolsNameSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetUsageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12409,6 +14143,97 @@ func (c *ClientWithResponses) PutAdminAuthWithResponse(ctx context.Context, para
 		return nil, err
 	}
 	return ParsePutAdminAuthResponse(rsp)
+}
+
+// GetAgentsWithResponse Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+func (c *ClientWithResponses) GetAgentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentsResponse, error) {
+	rsp, err := c.GetAgents(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentsResponse(rsp)
+}
+
+// DeleteAgentsNameWithResponse Remove one `agents:` definition, refused while another config section still references it by bare name
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+func (c *ClientWithResponses) DeleteAgentsNameWithResponse(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*DeleteAgentsNameResponse, error) {
+	rsp, err := c.DeleteAgentsName(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteAgentsNameResponse(rsp)
+}
+
+// GetAgentsNameWithResponse One `agents:` definition
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+func (c *ClientWithResponses) GetAgentsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetAgentsNameResponse, error) {
+	rsp, err := c.GetAgentsName(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentsNameResponse(rsp)
+}
+
+// PutAgentsNameWithBodyWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *ClientWithResponses) PutAgentsNameWithBodyWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error) {
+	rsp, err := c.PutAgentsNameWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutAgentsNameResponse(rsp)
+}
+
+// PutAgentsNameWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *ClientWithResponses) PutAgentsNameWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error) {
+	rsp, err := c.PutAgentsName(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutAgentsNameResponse(rsp)
+}
+
+// PatchAgentsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *ClientWithResponses) PatchAgentsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error) {
+	rsp, err := c.PatchAgentsNameSettingsWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchAgentsNameSettingsResponse(rsp)
+}
+
+// PatchAgentsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *ClientWithResponses) PatchAgentsNameSettingsWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error) {
+	rsp, err := c.PatchAgentsNameSettings(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchAgentsNameSettingsResponse(rsp)
 }
 
 // GetAuditWithResponse Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
@@ -13282,7 +15107,7 @@ func (c *ClientWithResponses) GetOpenapiJsonWithResponse(ctx context.Context, re
 	return ParseGetOpenapiJsonResponse(rsp)
 }
 
-// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -13503,6 +15328,97 @@ func (c *ClientWithResponses) PostSigningKeyRotateWithResponse(ctx context.Conte
 	return ParsePostSigningKeyRotateResponse(rsp)
 }
 
+// GetToolsWithResponse Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+func (c *ClientWithResponses) GetToolsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetToolsResponse, error) {
+	rsp, err := c.GetTools(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsResponse(rsp)
+}
+
+// DeleteToolsNameWithResponse Remove one `tools:` definition, refused while another config section still references it by bare name
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+func (c *ClientWithResponses) DeleteToolsNameWithResponse(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*DeleteToolsNameResponse, error) {
+	rsp, err := c.DeleteToolsName(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteToolsNameResponse(rsp)
+}
+
+// GetToolsNameWithResponse One `tools:` definition
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+func (c *ClientWithResponses) GetToolsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameResponse, error) {
+	rsp, err := c.GetToolsName(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsNameResponse(rsp)
+}
+
+// PutToolsNameWithBodyWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *ClientWithResponses) PutToolsNameWithBodyWithResponse(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error) {
+	rsp, err := c.PutToolsNameWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutToolsNameResponse(rsp)
+}
+
+// PutToolsNameWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *ClientWithResponses) PutToolsNameWithResponse(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error) {
+	rsp, err := c.PutToolsName(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutToolsNameResponse(rsp)
+}
+
+// PatchToolsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *ClientWithResponses) PatchToolsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error) {
+	rsp, err := c.PatchToolsNameSettingsWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchToolsNameSettingsResponse(rsp)
+}
+
+// PatchToolsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *ClientWithResponses) PatchToolsNameSettingsWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error) {
+	rsp, err := c.PatchToolsNameSettings(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchToolsNameSettingsResponse(rsp)
+}
+
 // GetUsageWithResponse Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 //
 // Returns a wrapper object for the known response body format(s).
@@ -13604,6 +15520,321 @@ func ParsePutAdminAuthResponse(rsp *http.Response) (*PutAdminAuthResponse, error
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAgentsResponse parses an HTTP response from a GetAgentsWithResponse call
+func ParseGetAgentsResponse(rsp *http.Response) (*GetAgentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageNamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteAgentsNameResponse parses an HTTP response from a DeleteAgentsNameWithResponse call
+func ParseDeleteAgentsNameResponse(rsp *http.Response) (*DeleteAgentsNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteAgentsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAgentsNameResponse parses an HTTP response from a GetAgentsNameWithResponse call
+func ParseGetAgentsNameResponse(rsp *http.Response) (*GetAgentsNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutAgentsNameResponse parses an HTTP response from a PutAgentsNameWithResponse call
+func ParsePutAgentsNameResponse(rsp *http.Response) (*PutAgentsNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutAgentsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchAgentsNameSettingsResponse parses an HTTP response from a PatchAgentsNameSettingsWithResponse call
+func ParsePatchAgentsNameSettingsResponse(rsp *http.Response) (*PatchAgentsNameSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchAgentsNameSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Error
@@ -17472,6 +19703,321 @@ func ParsePostSigningKeyRotateResponse(rsp *http.Response) (*PostSigningKeyRotat
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsResponse parses an HTTP response from a GetToolsWithResponse call
+func ParseGetToolsResponse(rsp *http.Response) (*GetToolsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageNamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteToolsNameResponse parses an HTTP response from a DeleteToolsNameWithResponse call
+func ParseDeleteToolsNameResponse(rsp *http.Response) (*DeleteToolsNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteToolsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsNameResponse parses an HTTP response from a GetToolsNameWithResponse call
+func ParseGetToolsNameResponse(rsp *http.Response) (*GetToolsNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutToolsNameResponse parses an HTTP response from a PutToolsNameWithResponse call
+func ParsePutToolsNameResponse(rsp *http.Response) (*PutToolsNameResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutToolsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchToolsNameSettingsResponse parses an HTTP response from a PatchToolsNameSettingsWithResponse call
+func ParsePatchToolsNameSettingsResponse(rsp *http.Response) (*PatchToolsNameSettingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchToolsNameSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
 		var dest Error
