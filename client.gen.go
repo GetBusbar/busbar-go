@@ -91,6 +91,48 @@ func (e DeleteOverlaySectionParamsSection) Valid() bool {
 	}
 }
 
+// A2aTrustView THE TRUST VIEW of one registered agent — what both verbs answer with.
+//
+// The sibling of [`crate::mcp::admin_view::McpTrustView`] and shaped like it on purpose: an
+// operator console rendering both planes should be rendering one component. It is NOT the same
+// type, because the two planes' capability vocabularies differ (a `tools:` entry has an approved
+// digest per tool; an `agents:` entry has a skill set on a card) and merging them would mean one
+// of the planes filling in fields that mean nothing to it.
+type A2aTrustView struct {
+	// Added Offered now, never ruled on.
+	Added []string `json:"added"`
+
+	// Changed Approved, but offered at a DIFFERENT digest. THIS IS THE RUG-PULL ROW.
+	Changed []string `json:"changed"`
+
+	// Failure Why the contact failed, when it did.
+	Failure *string `json:"failure"`
+
+	// Fingerprint THE CANONICAL CARD FINGERPRINT AN OPERATOR IS BEING ASKED TO APPROVE. Surfaced explicitly
+	// rather than left for a caller to dig out, because this is the one string that goes in front
+	// of the human and `approve` refuses anything else.
+	Fingerprint *string `json:"fingerprint"`
+	Name        string  `json:"name"`
+
+	// ObservedSkills How many skills the observation carried.
+	ObservedSkills uint `json:"observed_skills"`
+
+	// PinChanged The presented identity is not the locked one. Its own axis: adopting a new identity is a
+	// different act from adopting new content.
+	PinChanged bool `json:"pin_changed"`
+
+	// PinMechanism The operator's word for the authenticity root, as the OBSERVED pin names it. Never
+	// interpreted by the machine.
+	PinMechanism string `json:"pin_mechanism"`
+
+	// Removed Approved, and no longer offered.
+	Removed []string `json:"removed"`
+
+	// State `pending`, `approved`, `quarantined`, `suspended` or `error`. DERIVED on every read from the
+	// standing approval and the sighting, so there is no stored state to go stale.
+	State string `json:"state"`
+}
+
 // AdminAuthPutView `PUT /admin-auth`: the resource post-state (`{configured, modules}`, the same shape
 // `GET /admin-auth` returns) plus apply metadata, so a client uses the PUT response as post-state.
 type AdminAuthPutView struct {
@@ -112,6 +154,13 @@ type AdminAuthView struct {
 	// Modules The active admin-plane guard module names, the `admin_auth` chain verbatim (e.g.
 	// `["admin-tokens"]`), reported in order. Empty when the admin plane is open.
 	Modules []string `json:"modules"`
+}
+
+// ApproveReq The `approve` request body. ONE required field, and it is required for the reason the module note
+// gives: it is the operator's evidence that they looked.
+type ApproveReq struct {
+	// Fingerprint The canonical card fingerprint EXACTLY as `connect` reported it.
+	Fingerprint string `json:"fingerprint"`
 }
 
 // AuditEntry One admin audit record. `outcome` is a stable token tooling can branch on. The record is
@@ -647,16 +696,40 @@ type HookTransportView struct {
 // no `global_hooks:` config key to write: 1.5.3 deleted it, and a hook is now DEFINED once in the
 // top-level `hooks:` named map (its `module:` naming the `kind: hook` plugin that backs it) and
 // ATTACHED by bare name, at the reserved all-pools key `pools.hooks:`, which is what makes it
-// global, or at one pool's own `hooks:` list. `groups:` and `phase:` are the config-file selection
-// axes (which callers, which pipeline stages). On THIS API the same hook is written with
+// global, or at one pool's own `hooks:` list. On THIS API the same hook is written with
 // `global: true`; the wire and the config file are deliberately different surfaces. Live connection
 // status (`health`) is a separate endpoint. Additive-only.
+//
+// `groups:` and `phase:` are the config-file SELECTION axes (which callers, which pipeline stages),
+// and this view used to omit both. That was not a decision to keep them file-only: both are
+// WRITABLE over this API (`POST`/`PUT /hooks` deserialize `config::HookCfg` verbatim, which is the
+// documented "paste a `hooks:` entry" contract), so omitting them made a field an operator can set
+// through the API one they could not read back through it. `groups` and the stage pair
+// (`phase` + `fires_at`) close that.
 type HookView struct {
-	// At TAP observation stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or `None` for a gate.
+	// At The LEGACY single-valued tap stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or
+	// `null`. Kept for back-compat and NOT the field to read: `null` here does NOT mean "a gate"
+	// and does not mean "unscoped". Every hook written in the current top-level `hooks:` grammar
+	// has `at: null` by construction (`config::hook_cfg_from_def` never sets it, and
+	// `--migrate-config` rewrites a legacy `at:` into `phase:`), so this field is `null` for
+	// essentially every hook a running deployment has. Read `fires_at`.
 	At *string `json:"at"`
+
+	// FiresAt The RESOLVED stage set: the stages this hook ACTUALLY fires at, in pipeline order, never
+	// empty. This is the field that answers "when does this hook run", and it is computed by
+	// `config::HookCfg::resolved_stages` through the same `fires_at_stage` predicate the firing
+	// path uses, so it cannot disagree with runtime behavior. It reflects the frozen precedence
+	// (a non-empty `phase:` wins, else the legacy single `at:`, else the four core stages) without
+	// asking the reader to re-derive it from the two spellings above.
+	FiresAt []string `json:"fires_at"`
 
 	// Global Whether this hook fires on every request (globally wired).
 	Global bool `json:"global"`
+
+	// Groups The `groups:` CALLER SCOPE exactly as configured: the caller groups this hook fires for,
+	// empty meaning ALL callers (unscoped). The other half of "when does this hook run", and the
+	// same writable-but-unreadable gap `phase` had.
+	Groups []string `json:"groups"`
 
 	// Kind `"tap"` (fire-and-forget) or `"gate"` (fire-and-wait).
 	Kind string `json:"kind"`
@@ -668,6 +741,12 @@ type HookView struct {
 	// are ILLEGAL hook names on every write path (`config::RESERVED_HOOK_NAMES`), so a value in
 	// the terminal set is always a terminal and anything else is always a hook reference.
 	OnError string `json:"on_error"`
+
+	// Phase The `phase:` STAGE LIST exactly as configured, empty when unset. The literal config echo,
+	// for an operator diffing what they wrote against what busbar parsed. It is NOT the effective
+	// answer on its own: empty means "fall back", and what it falls back TO is `at:` if set and the
+	// four core stages otherwise. For the effective answer read `fires_at`.
+	Phase []string `json:"phase"`
 
 	// Priority Rewrite/reject ordering key (transform-chain order + reject tie-break).
 	Priority uint16 `json:"priority"`
@@ -1858,6 +1937,9 @@ type PutAdminAuthJSONRequestBody = PutAuthBody
 // PutAgentsNameJSONRequestBody defines body for PutAgentsName for application/json ContentType.
 type PutAgentsNameJSONRequestBody PutAgentsNameJSONBody
 
+// PostAgentsNameApproveJSONRequestBody defines body for PostAgentsNameApprove for application/json ContentType.
+type PostAgentsNameApproveJSONRequestBody = ApproveReq
+
 // PatchAgentsNameSettingsJSONRequestBody defines body for PatchAgentsNameSettings for application/json ContentType.
 type PatchAgentsNameSettingsJSONRequestBody = NamedSettingsReq
 
@@ -2051,6 +2133,25 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
 	PutAgentsName(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAgentsNameApproveWithBody Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApproveWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAgentsNameApprove Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApprove(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAgentsNameConnect Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing and writes nothing
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+	PostAgentsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// PatchAgentsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
 	//
@@ -2752,6 +2853,55 @@ func (c *Client) PutAgentsNameWithBody(ctx context.Context, name string, params 
 // Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
 func (c *Client) PutAgentsName(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPutAgentsNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAgentsNameApproveWithBody Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *Client) PostAgentsNameApproveWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAgentsNameApproveRequestWithBody(c.Server, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAgentsNameApprove Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *Client) PostAgentsNameApprove(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAgentsNameApproveRequest(c.Server, name, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAgentsNameConnect Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing and writes nothing
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+func (c *Client) PostAgentsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAgentsNameConnectRequest(c.Server, name)
 	if err != nil {
 		return nil, err
 	}
@@ -4562,6 +4712,87 @@ func NewPutAgentsNameRequestWithBody(server string, name string, params *PutAgen
 			req.Header.Set("If-Match", headerParam0)
 		}
 
+	}
+
+	return req, nil
+}
+
+// NewPostAgentsNameApproveRequest calls the generic PostAgentsNameApprove builder with application/json body
+func NewPostAgentsNameApproveRequest(server string, name string, body PostAgentsNameApproveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostAgentsNameApproveRequestWithBody(server, name, "application/json", bodyReader)
+}
+
+// NewPostAgentsNameApproveRequestWithBody constructs an http.Request for the PostAgentsNameApprove method, with any body, and a specified content type
+func NewPostAgentsNameApproveRequestWithBody(server string, name string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostAgentsNameConnectRequest constructs an http.Request for the PostAgentsNameConnect method
+func NewPostAgentsNameConnectRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s/connect", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
 	}
 
 	return req, nil
@@ -7895,6 +8126,27 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
 	PutAgentsNameWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error)
 
+	// PostAgentsNameApproveWithBodyWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApproveWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error)
+
+	// PostAgentsNameApproveWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApproveWithResponse(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error)
+
+	// PostAgentsNameConnectWithResponse Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing and writes nothing
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+	PostAgentsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostAgentsNameConnectResponse, error)
+
 	// PatchAgentsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -9011,6 +9263,165 @@ func (r PutAgentsNameResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r PutAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostAgentsNameApproveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *A2aTrustView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON200() *A2aTrustView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostAgentsNameApproveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostAgentsNameApproveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostAgentsNameApproveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostAgentsNameApproveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostAgentsNameConnectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *A2aTrustView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON200() *A2aTrustView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostAgentsNameConnectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostAgentsNameConnectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostAgentsNameConnectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostAgentsNameConnectResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -14683,6 +15094,45 @@ func (c *ClientWithResponses) PutAgentsNameWithResponse(ctx context.Context, nam
 	return ParsePutAgentsNameResponse(rsp)
 }
 
+// PostAgentsNameApproveWithBodyWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *ClientWithResponses) PostAgentsNameApproveWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error) {
+	rsp, err := c.PostAgentsNameApproveWithBody(ctx, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAgentsNameApproveResponse(rsp)
+}
+
+// PostAgentsNameApproveWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *ClientWithResponses) PostAgentsNameApproveWithResponse(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error) {
+	rsp, err := c.PostAgentsNameApprove(ctx, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAgentsNameApproveResponse(rsp)
+}
+
+// PostAgentsNameConnectWithResponse Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing and writes nothing
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+func (c *ClientWithResponses) PostAgentsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostAgentsNameConnectResponse, error) {
+	rsp, err := c.PostAgentsNameConnect(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAgentsNameConnectResponse(rsp)
+}
+
 // PatchAgentsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -16279,6 +16729,135 @@ func ParsePutAgentsNameResponse(rsp *http.Response) (*PutAgentsNameResponse, err
 			return nil, err
 		}
 		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostAgentsNameApproveResponse parses an HTTP response from a PostAgentsNameApproveWithResponse call
+func ParsePostAgentsNameApproveResponse(rsp *http.Response) (*PostAgentsNameApproveResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostAgentsNameApproveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest A2aTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostAgentsNameConnectResponse parses an HTTP response from a PostAgentsNameConnectWithResponse call
+func ParsePostAgentsNameConnectResponse(rsp *http.Response) (*PostAgentsNameConnectResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostAgentsNameConnectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest A2aTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest Error
