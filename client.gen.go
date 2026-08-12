@@ -156,8 +156,8 @@ type AdminAuthView struct {
 	Modules []string `json:"modules"`
 }
 
-// ApproveReq The `approve` request body. ONE required field, and it is required for the reason the module note
-// gives: it is the operator's evidence that they looked.
+// ApproveReq The `approve` request body. ONE required field, and it is required because it is the operator's
+// evidence that they looked.
 type ApproveReq struct {
 	// Fingerprint The canonical card fingerprint EXACTLY as `connect` reported it.
 	Fingerprint string `json:"fingerprint"`
