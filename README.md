@@ -1,5 +1,7 @@
 # busbar-go (Go SDK)
 
+[![codecov](https://codecov.io/gh/GetBusbar/busbar-go/branch/dev/graph/badge.svg)](https://codecov.io/gh/GetBusbar/busbar-go)
+
 A typed Go client for the **Busbar Admin API** (`/api/v1/admin`).
 
 Generated from the typed OpenAPI 3.1 schema in [`openapi.json`](./openapi.json)
