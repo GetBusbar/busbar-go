@@ -51,7 +51,7 @@ jobs:
           git config user.name "busbar-bot"
           git config user.email "bot@getbusbar.com"
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
           go-version: "1.25"
 
