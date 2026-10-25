@@ -1,0 +1,31 @@
+# Imported from .github/workflows/ci.yml by `modernci import github`.
+to: dev
+checks:
+  build:
+    run: |
+      set -e
+      # Regenerate client from openapi.json
+      make generate </dev/null
+      # Fail if the committed client is stale
+      ( bash -e /dev/fd/3 3<<'MODERNCI_STEP' </dev/null
+      git diff --exit-code -- client.gen.go \
+        || (echo "::error::Generated client is out of date. Run 'make generate' and commit." && exit 1)
+      MODERNCI_STEP
+      )
+      # Fail if the README's version claims have drifted
+      python3 .github/check-readme-versions.py </dev/null
+      # Build
+      go build ./... </dev/null
+      # Vet
+      go vet ./... </dev/null
+    requires:
+    - go
+  coverage:
+    run: |
+      set -e
+      # Run unit tests with coverage
+      go test ./... -covermode=atomic -coverprofile=coverage.out </dev/null
+    requires:
+    - go
+env:
+  CI: 'true'
