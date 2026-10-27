@@ -21,7 +21,7 @@ import busbar "github.com/GetBusbar/busbar-go"
   written down here on purpose: a Go module's version is a git tag, with no in-repo
   manifest to check a README claim against, so a hardcoded one would only ever be as
   fresh as the last person who remembered to edit it.
-- **Generated from:** busbar OpenAPI `info.version` `1.5.3`, the bundled
+- **Generated from:** busbar OpenAPI `info.version` `1.5.4`, the bundled
   [`openapi.json`](./openapi.json).
 
 It targets the frozen, additive-only `/api/v1/admin` surface. `dev` is kept
@@ -83,7 +83,7 @@ func main() {
 
 	// resp.JSON200 is *InfoView — TYPED. .Version is string, .Topology is a struct.
 	info := resp.JSON200
-	fmt.Println("busbar version:", info.Version)        // -> "1.5.3"
+	fmt.Println("busbar version:", info.Version)        // -> "1.5.4"
 	fmt.Println("pools:", info.Topology.Pools)
 	fmt.Println("config version:", info.ConfigVersion)
 }
