@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -46,5 +47,53 @@ func TestRefreshedTrustApproveRequest(t *testing.T) {
 	}
 	if body.Key != "plane/counterparty/item" {
 		t.Fatalf("key = %q", body.Key)
+	}
+}
+
+func TestNamedMutationResponsesPreserveRestartMetadata(t *testing.T) {
+	const body = `{"name":"events","module":"file","settings_keys":[],"reload_to_apply":["export:events"],"note":"restart required"}`
+	for _, tc := range []struct {
+		name  string
+		parse func(*http.Response) (any, error)
+	}{
+		{"put", func(response *http.Response) (any, error) {
+			parsed, err := ParsePutExportNameResponse(response)
+			if err != nil {
+				return nil, err
+			}
+			return parsed.JSON200, nil
+		}},
+		{"patch", func(response *http.Response) (any, error) {
+			parsed, err := ParsePatchExportNameSettingsResponse(response)
+			if err != nil {
+				return nil, err
+			}
+			return parsed.JSON200, nil
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parsed, err := tc.parse(&http.Response{
+				StatusCode: http.StatusOK,
+				Header:     http.Header{"Content-Type": {"application/json"}},
+				Body:       io.NopCloser(strings.NewReader(body)),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			encoded, err := json.Marshal(parsed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var preserved struct {
+				ReloadToApply []string `json:"reload_to_apply"`
+				Note          string   `json:"note"`
+			}
+			if err := json.Unmarshal(encoded, &preserved); err != nil {
+				t.Fatal(err)
+			}
+			if len(preserved.ReloadToApply) != 1 || preserved.ReloadToApply[0] != "export:events" || preserved.Note != "restart required" {
+				t.Fatalf("typed mutation response lost restart metadata: %s", encoded)
+			}
+		})
 	}
 }

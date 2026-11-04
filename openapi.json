@@ -2809,7 +2809,7 @@
         "description": "ONE CAPABILITY'S STANDING STATUS, the three-way answer a trust view has to render.\n\nThree and not two: `approved at a digest`, `rejected`, and `allowed but never ruled on`. The\nthird is `pending` and it is the one a queue exists to drain, so collapsing it into \"not\napproved\" would hide the operator's whole worklist.",
         "properties": {
           "approved_digest": {
-            "description": "The digest the operator approved, when there is one. A rejected or pending capability has\nnone, and reporting the last OBSERVED digest here would read as an approval.",
+            "description": "The digest held by the kernel, when there is one. Rejection or pending status does not imply\nthat this historical or configured approval currently permits serving.",
             "type": [
               "string",
               "null"
@@ -2926,7 +2926,7 @@
             "type": "array"
           },
           "state": {
-            "description": "`pending`, `approved`, `quarantined`, `suspended` or `error`. DERIVED from the approval and\nthe last sighting on every read, so there is no stored state to go stale.",
+            "description": "`pending`, `approved`, `quarantined` or `error`. DERIVED from the approval and\nthe last sighting on every read, so there is no stored state to go stale.",
             "type": "string"
           }
         },
@@ -3017,6 +3017,95 @@
         "required": [
           "model",
           "provider"
+        ],
+        "type": "object"
+      },
+      "MutatedDefView": {
+        "description": "THE MUTATION RESPONSE for an upsert/settings write: the stored definition, PLUS the\nrestart-required signal for boot-bound routes, planes and export instances or projections.\n\n`#[serde(flatten)]` keeps the definition's own fields exactly where they have always been, so the\nsignal is purely ADDITIVE — and both signal fields are omitted entirely when nothing is pending,\nso the ordinary body is byte-identical to what it was. This is the `export:` named map's sibling of\n`PUT /config/settings`'s `reload_to_apply`/`note` pair (`handlers::reload_to_apply_fields`), which\nreports the same class of boot-frozen change for the single-value settings surface.",
+        "properties": {
+          "browser_login_configured": {
+            "description": "`identity-providers` ONLY: whether a `browser_login:` block is configured, the presence that\nputs a button on the hosted login page.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "fingerprint_pinned": {
+            "description": "`agents` ONLY: whether an approved card FINGERPRINT is pinned yet. A registration with a\nroot but no fingerprint is the normal state of a fresh entry awaiting approval, and it is\nthe state an operator most needs to be able to see.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "max_admin_scope": {
+            "description": "`identity-providers` ONLY: the per-provider ADMIN CEILING (`read-only` | `full`). There is no\n`none` token: `Scope::parse_ceiling` rejects it, because a ceiling\ncaps what a grant can reach and cannot express the absence of one.\n`None` ⇒ the definition names no ceiling, so the most restrictive default applies. Omitted\nentirely for a section that carries no ceiling.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "module": {
+            "description": "The `module:` backing this instance (a built-in name or a signed-plugin name/alias).\n\nALWAYS present, matching 1.5.5's wire shape byte-for-byte (`required` includes `module`,\nschema type `\"string\"`, never nullable): 1.5.5 had no named-map section whose entries\ncarried no module, so it has no representation for one, and the ruling is 1:1 with 1.5.5\nrather than inventing a new shape. EMPTY-STRINGED, not omitted, for a section whose entries\nare not plugin instances -- today `agents:`, whose entries describe endpoints somebody else\nruns (`NamedMapSection::requires_module`). Every section that HAS a module requires it to be\nnon-empty, so an empty string is unambiguous for \"no module\" without a `skip_serializing_if`\nthat would shrink `required` below 1.5.5's.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The instance NAME: the map key, and the token every reference site uses.",
+            "type": "string"
+          },
+          "note": {
+            "description": "The operator-facing sentence for [`Self::reload_to_apply`]; omitted with it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pin_mechanism": {
+            "description": "`agents` ONLY: which authenticity root this registration is pinned to (`jws_issuer_key` |\n`cert_spki` | `mtls` | `unpinned`). Projected because an operator scanning a registration\nlist needs to SEE which entries have no root; a mechanism that could only be discovered by\nreading the config file is a mechanism nobody audits.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reload_to_apply": {
+            "description": "The plugin-route PATHS this mutation declared that the process cannot serve until it restarts,\nbecause the axum router registers each path once, at boot, and a config apply swaps only\n`Arc<App>`; then the plane SECTIONS it first wrote whose plane the process did not open at\nboot (a plane is opened once, at process start, when its section is configured); and export\ninstances whose membership, module or projection differs from the boot-opened sink.\nEmpty and omitted when this mutation leaves no boot-bound change.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reverify_ttl": {
+            "description": "`agents` ONLY: the re-verification cadence this registration carries, as written. The\nbackend `url:` is deliberately NOT projected here: it is the real remote endpoint and is\nnever client-visible.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "settings_keys": {
+            "description": "The KEY NAMES of the module's opaque settings bag, sorted, WITHOUT their values, the\nredacted projection of `settings:`. Operator/API-owned and never interpreted here, but also\nnever a place a VALUE can leak from: a settings value may be a credential (see the type doc),\nand this surface is reachable at READ-ONLY admin scope. An empty bag ⇒ an empty list. The\nvalues are readable only where they are writable: the config file and the config overlay.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "token_configured": {
+            "description": "`identity-providers` ONLY: whether a `token:` secret REFERENCE is configured (the built-in\n`admin-tokens` operator credential). The reference itself is never projected.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "unparseable": {
+            "description": "Set ONLY on an entry that is STORED in the config overlay but could NOT be parsed into this\nsection's typed config by this binary (a downgrade whose struct lost a field, a hand-edited\noverlay); the value is the parse error. Such an entry is dropped at every rebuild, so it is\nNOT live: `module`/`settings_keys` are the raw stored document's best-effort projection, not\na resolved definition. Present so the drop is DISCOVERABLE here rather than only in a boot\nlog line. Absent (and omitted from the body) for every live definition.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "module",
+          "settings_keys"
         ],
         "type": "object"
       },
@@ -3226,6 +3315,28 @@
           "items": {
             "items": {
               "$ref": "#/components/schemas/PluginView"
+            },
+            "type": "array"
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "type": "object"
+      },
+      "Page_PoolDetailView": {
+        "description": "A cursor-paginated list envelope. `items` is this page; `next_cursor` is `Some` when more remain.\nGeneric over the item view so every list endpoint shares one shape.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PoolDetailView"
             },
             "type": "array"
           },
@@ -3848,6 +3959,17 @@
           "members"
         ],
         "type": "object"
+      },
+      "PoolListView": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/Page_PoolView"
+          },
+          {
+            "$ref": "#/components/schemas/Page_PoolDetailView"
+          }
+        ],
+        "description": "`GET /pools`: summary pages by default or with `detail=false`; live member-status pages with\n`detail=true`. Untagged because both branches retain the existing `{items, next_cursor}` envelope.\nUse an inclusive union: empty pages (and permissive summary schemas) can match both branches."
       },
       "PoolMemberStatusView": {
         "description": "One member's live status within a pool. The breaker signal is the release-exposed\n`usable`/`cooldown_remaining_seconds` pair (a lane in breaker cooldown reports `usable: false` with the\nseconds remaining), the same summary `/stats` surfaces.",
@@ -4624,7 +4746,7 @@
     "title": "Busbar Admin API",
     "version": "1.6.0",
     "x-busbar-marks": {
-      "money": "Every money figure is a JSON string holding a decimal integer; every count is a JSON number.",
+      "money": "Money fields use the representation declared by their schema: ledger Amount values are decimal-integer JSON strings; spend_cents and spend_micros are JSON integers. Counts are JSON numbers.",
       "scope": "ONE generated document, describing every administrative operation this build can serve; a node serves it filtered to the planes it configured.",
       "x-busbar-plane": "The operation is mounted only on a node whose config carries that plane's `<section>:` block; elsewhere its path answers `404 not_found` and the node's served `GET /openapi.json` omits it (and every schema only it references).",
       "x-busbar-since": "Added in that release, and answered by the node's administrative loop."
@@ -5185,7 +5307,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -5498,7 +5620,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -5990,7 +6112,7 @@
               }
             }
           },
-          "required": true
+          "required": false
         },
         "responses": {
           "200": {
@@ -7560,7 +7682,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -7686,7 +7808,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -9869,7 +9991,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -9995,7 +10117,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -12742,7 +12864,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_PoolView"
+                  "$ref": "#/components/schemas/PoolListView"
                 }
               }
             },
@@ -13522,7 +13644,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },
@@ -13893,7 +14015,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/NamedDefView"
+                  "$ref": "#/components/schemas/MutatedDefView"
                 }
               }
             },

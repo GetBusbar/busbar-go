@@ -1592,8 +1592,8 @@ type ListView struct {
 // third is `pending` and it is the one a queue exists to drain, so collapsing it into "not
 // approved" would hide the operator's whole worklist.
 type McpCapabilityView struct {
-	// ApprovedDigest The digest the operator approved, when there is one. A rejected or pending capability has
-	// none, and reporting the last OBSERVED digest here would read as an approval.
+	// ApprovedDigest The digest held by the kernel, when there is one. Rejection or pending status does not imply
+	// that this historical or configured approval currently permits serving.
 	ApprovedDigest *string `json:"approved_digest"`
 
 	// Status `approved`, `rejected` or `pending`.
@@ -1650,7 +1650,7 @@ type McpTrustView struct {
 	// Removed Approved, and no longer offered.
 	Removed []string `json:"removed"`
 
-	// State `pending`, `approved`, `quarantined`, `suspended` or `error`. DERIVED from the approval and
+	// State `pending`, `approved`, `quarantined` or `error`. DERIVED from the approval and
 	// the last sighting on every read, so there is no stored state to go stale.
 	State string `json:"state"`
 }
@@ -1685,6 +1685,88 @@ type ModelUsageView struct {
 type ModelView struct {
 	Model    string `json:"model"`
 	Provider string `json:"provider"`
+}
+
+// MutatedDefView THE MUTATION RESPONSE for an upsert/settings write: the stored definition, PLUS the
+// restart-required signal for boot-bound routes, planes and export instances or projections.
+//
+// `#[serde(flatten)]` keeps the definition's own fields exactly where they have always been, so the
+// signal is purely ADDITIVE — and both signal fields are omitted entirely when nothing is pending,
+// so the ordinary body is byte-identical to what it was. This is the `export:` named map's sibling of
+// `PUT /config/settings`'s `reload_to_apply`/`note` pair (`handlers::reload_to_apply_fields`), which
+// reports the same class of boot-frozen change for the single-value settings surface.
+type MutatedDefView struct {
+	// BrowserLoginConfigured `identity-providers` ONLY: whether a `browser_login:` block is configured, the presence that
+	// puts a button on the hosted login page.
+	BrowserLoginConfigured *bool `json:"browser_login_configured,omitempty"`
+
+	// FingerprintPinned `agents` ONLY: whether an approved card FINGERPRINT is pinned yet. A registration with a
+	// root but no fingerprint is the normal state of a fresh entry awaiting approval, and it is
+	// the state an operator most needs to be able to see.
+	FingerprintPinned *bool `json:"fingerprint_pinned,omitempty"`
+
+	// MaxAdminScope `identity-providers` ONLY: the per-provider ADMIN CEILING (`read-only` | `full`). There is no
+	// `none` token: `Scope::parse_ceiling` rejects it, because a ceiling
+	// caps what a grant can reach and cannot express the absence of one.
+	// `None` ⇒ the definition names no ceiling, so the most restrictive default applies. Omitted
+	// entirely for a section that carries no ceiling.
+	MaxAdminScope *string `json:"max_admin_scope,omitempty"`
+
+	// Module The `module:` backing this instance (a built-in name or a signed-plugin name/alias).
+	//
+	// ALWAYS present, matching 1.5.5's wire shape byte-for-byte (`required` includes `module`,
+	// schema type `"string"`, never nullable): 1.5.5 had no named-map section whose entries
+	// carried no module, so it has no representation for one, and the ruling is 1:1 with 1.5.5
+	// rather than inventing a new shape. EMPTY-STRINGED, not omitted, for a section whose entries
+	// are not plugin instances -- today `agents:`, whose entries describe endpoints somebody else
+	// runs (`NamedMapSection::requires_module`). Every section that HAS a module requires it to be
+	// non-empty, so an empty string is unambiguous for "no module" without a `skip_serializing_if`
+	// that would shrink `required` below 1.5.5's.
+	Module string `json:"module"`
+
+	// Name The instance NAME: the map key, and the token every reference site uses.
+	Name string `json:"name"`
+
+	// Note The operator-facing sentence for [`Self::reload_to_apply`]; omitted with it.
+	Note *string `json:"note,omitempty"`
+
+	// PinMechanism `agents` ONLY: which authenticity root this registration is pinned to (`jws_issuer_key` |
+	// `cert_spki` | `mtls` | `unpinned`). Projected because an operator scanning a registration
+	// list needs to SEE which entries have no root; a mechanism that could only be discovered by
+	// reading the config file is a mechanism nobody audits.
+	PinMechanism *string `json:"pin_mechanism,omitempty"`
+
+	// ReloadToApply The plugin-route PATHS this mutation declared that the process cannot serve until it restarts,
+	// because the axum router registers each path once, at boot, and a config apply swaps only
+	// `Arc<App>`; then the plane SECTIONS it first wrote whose plane the process did not open at
+	// boot (a plane is opened once, at process start, when its section is configured); and export
+	// instances whose membership, module or projection differs from the boot-opened sink.
+	// Empty and omitted when this mutation leaves no boot-bound change.
+	ReloadToApply *[]string `json:"reload_to_apply,omitempty"`
+
+	// ReverifyTtl `agents` ONLY: the re-verification cadence this registration carries, as written. The
+	// backend `url:` is deliberately NOT projected here: it is the real remote endpoint and is
+	// never client-visible.
+	ReverifyTtl *string `json:"reverify_ttl,omitempty"`
+
+	// SettingsKeys The KEY NAMES of the module's opaque settings bag, sorted, WITHOUT their values, the
+	// redacted projection of `settings:`. Operator/API-owned and never interpreted here, but also
+	// never a place a VALUE can leak from: a settings value may be a credential (see the type doc),
+	// and this surface is reachable at READ-ONLY admin scope. An empty bag ⇒ an empty list. The
+	// values are readable only where they are writable: the config file and the config overlay.
+	SettingsKeys []string `json:"settings_keys"`
+
+	// TokenConfigured `identity-providers` ONLY: whether a `token:` secret REFERENCE is configured (the built-in
+	// `admin-tokens` operator credential). The reference itself is never projected.
+	TokenConfigured *bool `json:"token_configured,omitempty"`
+
+	// Unparseable Set ONLY on an entry that is STORED in the config overlay but could NOT be parsed into this
+	// section's typed config by this binary (a downgrade whose struct lost a field, a hand-edited
+	// overlay); the value is the parse error. Such an entry is dropped at every rebuild, so it is
+	// NOT live: `module`/`settings_keys` are the raw stored document's best-effort projection, not
+	// a resolved definition. Present so the drop is DISCOVERABLE here rather than only in a boot
+	// log line. Absent (and omitted from the body) for every live definition.
+	Unparseable *string `json:"unparseable,omitempty"`
 }
 
 // NamedDefView ONE definition of ONE 1.5.3 named-DEFINITION map: the read shape of the GENERIC named-map CRUD
@@ -1822,6 +1904,13 @@ type PageNamedDefView struct {
 type PagePluginView struct {
 	Items      []PluginView `json:"items"`
 	NextCursor *string      `json:"next_cursor"`
+}
+
+// PagePoolDetailView A cursor-paginated list envelope. `items` is this page; `next_cursor` is `Some` when more remain.
+// Generic over the item view so every list endpoint shares one shape.
+type PagePoolDetailView struct {
+	Items      []PoolDetailView `json:"items"`
+	NextCursor *string          `json:"next_cursor"`
 }
 
 // PagePoolView A cursor-paginated list envelope. `items` is this page; `next_cursor` is `Some` when more remain.
@@ -2139,6 +2228,13 @@ type PluginView struct {
 type PoolDetailView struct {
 	Members []PoolMemberStatusView `json:"members"`
 	Name    string                 `json:"name"`
+}
+
+// PoolListView `GET /pools`: summary pages by default or with `detail=false`; live member-status pages with
+// `detail=true`. Untagged because both branches retain the existing `{items, next_cursor}` envelope.
+// Use an inclusive union: empty pages (and permissive summary schemas) can match both branches.
+type PoolListView struct {
+	union json.RawMessage
 }
 
 // PoolMemberStatusView One member's live status within a pool. The breaker signal is the release-exposed
@@ -3138,6 +3234,68 @@ func (t AuditRecipeValue) MarshalJSON() ([]byte, error) {
 }
 
 func (t *AuditRecipeValue) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPagePoolView returns the union data inside the PoolListView as a PagePoolView
+func (t PoolListView) AsPagePoolView() (PagePoolView, error) {
+	var body PagePoolView
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPagePoolView overwrites any union data inside the PoolListView as the provided PagePoolView
+func (t *PoolListView) FromPagePoolView(v PagePoolView) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePagePoolView performs a merge with any union data inside the PoolListView, using the provided PagePoolView
+func (t *PoolListView) MergePagePoolView(v PagePoolView) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPagePoolDetailView returns the union data inside the PoolListView as a PagePoolDetailView
+func (t PoolListView) AsPagePoolDetailView() (PagePoolDetailView, error) {
+	var body PagePoolDetailView
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromPagePoolDetailView overwrites any union data inside the PoolListView as the provided PagePoolDetailView
+func (t *PoolListView) FromPagePoolDetailView(v PagePoolDetailView) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePagePoolDetailView performs a merge with any union data inside the PoolListView, using the provided PagePoolDetailView
+func (t *PoolListView) MergePagePoolDetailView(v PagePoolDetailView) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PoolListView) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PoolListView) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -12310,7 +12468,7 @@ type PutAgentsNameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -12326,7 +12484,7 @@ type PutAgentsNameResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PutAgentsNameResponse) GetJSON200() *NamedDefView {
+func (r PutAgentsNameResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -12552,7 +12710,7 @@ type PatchAgentsNameSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -12570,7 +12728,7 @@ type PatchAgentsNameSettingsResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PatchAgentsNameSettingsResponse) GetJSON200() *NamedDefView {
+func (r PatchAgentsNameSettingsResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -14266,7 +14424,7 @@ type PutExportNameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -14284,7 +14442,7 @@ type PutExportNameResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PutExportNameResponse) GetJSON200() *NamedDefView {
+func (r PutExportNameResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -14356,7 +14514,7 @@ type PatchExportNameSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -14376,7 +14534,7 @@ type PatchExportNameSettingsResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PatchExportNameSettingsResponse) GetJSON200() *NamedDefView {
+func (r PatchExportNameSettingsResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -16051,7 +16209,7 @@ type PutIdentityProvidersNameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -16069,7 +16227,7 @@ type PutIdentityProvidersNameResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PutIdentityProvidersNameResponse) GetJSON200() *NamedDefView {
+func (r PutIdentityProvidersNameResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -16141,7 +16299,7 @@ type PatchIdentityProvidersNameSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -16161,7 +16319,7 @@ type PatchIdentityProvidersNameSettingsResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PatchIdentityProvidersNameSettingsResponse) GetJSON200() *NamedDefView {
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -18491,7 +18649,7 @@ type GetPoolsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *PagePoolView
+	JSON200 *PoolListView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -18505,7 +18663,7 @@ type GetPoolsResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r GetPoolsResponse) GetJSON200() *PagePoolView {
+func (r GetPoolsResponse) GetJSON200() *PoolListView {
 	return r.JSON200
 }
 
@@ -19168,7 +19326,7 @@ type PutToolsNameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -19184,7 +19342,7 @@ type PutToolsNameResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PutToolsNameResponse) GetJSON200() *NamedDefView {
+func (r PutToolsNameResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -19472,7 +19630,7 @@ type PatchToolsNameSettingsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
-	JSON200 *NamedDefView
+	JSON200 *MutatedDefView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -19490,7 +19648,7 @@ type PatchToolsNameSettingsResponse struct {
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
-func (r PatchToolsNameSettingsResponse) GetJSON200() *NamedDefView {
+func (r PatchToolsNameSettingsResponse) GetJSON200() *MutatedDefView {
 	return r.JSON200
 }
 
@@ -22183,7 +22341,7 @@ func ParsePutAgentsNameResponse(rsp *http.Response) (result *PutAgentsNameRespon
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -22398,7 +22556,7 @@ func ParsePatchAgentsNameSettingsResponse(rsp *http.Response) (result *PatchAgen
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -23920,7 +24078,7 @@ func ParsePutExportNameResponse(rsp *http.Response) (result *PutExportNameRespon
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -24001,7 +24159,7 @@ func ParsePatchExportNameSettingsResponse(rsp *http.Response) (result *PatchExpo
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -25525,7 +25683,7 @@ func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (result *PutIdent
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -25606,7 +25764,7 @@ func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (result
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -27692,7 +27850,7 @@ func ParseGetPoolsResponse(rsp *http.Response) (result *GetPoolsResponse, err er
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PagePoolView
+		var dest PoolListView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -28294,7 +28452,7 @@ func ParsePutToolsNameResponse(rsp *http.Response) (result *PutToolsNameResponse
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -28562,7 +28720,7 @@ func ParsePatchToolsNameSettingsResponse(rsp *http.Response) (result *PatchTools
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest NamedDefView
+		var dest MutatedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
