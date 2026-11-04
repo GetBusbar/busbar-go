@@ -26,6 +26,8 @@ const (
 	NotFound         ErrorErrorCode = "not_found"
 	RateLimited      ErrorErrorCode = "rate_limited"
 	Unauthorized     ErrorErrorCode = "unauthorized"
+	Unavailable      ErrorErrorCode = "unavailable"
+	UnpricedClass    ErrorErrorCode = "unpriced_class"
 	VersionConflict  ErrorErrorCode = "version_conflict"
 )
 
@@ -48,7 +50,83 @@ func (e ErrorErrorCode) Valid() bool {
 		return true
 	case Unauthorized:
 		return true
+	case Unavailable:
+		return true
+	case UnpricedClass:
+		return true
 	case VersionConflict:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for KindView.
+const (
+	Correction KindView = "correction"
+	Metering   KindView = "metering"
+	Usage      KindView = "usage"
+)
+
+// Valid indicates whether the value is a known member of the KindView enum.
+func (e KindView) Valid() bool {
+	switch e {
+	case Correction:
+		return true
+	case Metering:
+		return true
+	case Usage:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StateView.
+const (
+	Applied           StateView = "applied"
+	ConditionConflict StateView = "condition_conflict"
+	Intent            StateView = "intent"
+	LandedUnknown     StateView = "landed_unknown"
+	Settled           StateView = "settled"
+	VerdictLanded     StateView = "verdict_landed"
+	VerdictNotLanded  StateView = "verdict_not_landed"
+)
+
+// Valid indicates whether the value is a known member of the StateView enum.
+func (e StateView) Valid() bool {
+	switch e {
+	case Applied:
+		return true
+	case ConditionConflict:
+		return true
+	case Intent:
+		return true
+	case LandedUnknown:
+		return true
+	case Settled:
+		return true
+	case VerdictLanded:
+		return true
+	case VerdictNotLanded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Verdict.
+const (
+	Landed    Verdict = "landed"
+	NotLanded Verdict = "not_landed"
+)
+
+// Valid indicates whether the value is a known member of the Verdict enum.
+func (e Verdict) Valid() bool {
+	switch e {
+	case Landed:
+		return true
+	case NotLanded:
 		return true
 	default:
 		return false
@@ -57,26 +135,134 @@ func (e ErrorErrorCode) Valid() bool {
 
 // Defines values for DeleteOverlaySectionParamsSection.
 const (
-	Groups         DeleteOverlaySectionParamsSection = "groups"
-	Hooks          DeleteOverlaySectionParamsSection = "hooks"
-	PluginVersions DeleteOverlaySectionParamsSection = "plugin_versions"
-	Root           DeleteOverlaySectionParamsSection = "root"
+	Agents            DeleteOverlaySectionParamsSection = "agents"
+	Export            DeleteOverlaySectionParamsSection = "export"
+	Groups            DeleteOverlaySectionParamsSection = "groups"
+	Hooks             DeleteOverlaySectionParamsSection = "hooks"
+	IdentityProviders DeleteOverlaySectionParamsSection = "identity-providers"
+	PluginVersions    DeleteOverlaySectionParamsSection = "plugin_versions"
+	Root              DeleteOverlaySectionParamsSection = "root"
+	Tools             DeleteOverlaySectionParamsSection = "tools"
 )
 
 // Valid indicates whether the value is a known member of the DeleteOverlaySectionParamsSection enum.
 func (e DeleteOverlaySectionParamsSection) Valid() bool {
 	switch e {
+	case Agents:
+		return true
+	case Export:
+		return true
 	case Groups:
 		return true
 	case Hooks:
+		return true
+	case IdentityProviders:
 		return true
 	case PluginVersions:
 		return true
 	case Root:
 		return true
+	case Tools:
+		return true
 	default:
 		return false
 	}
+}
+
+// A2aTrustView THE TRUST VIEW of one registered agent — what both verbs answer with.
+//
+// The sibling of `busbar_mcp::mcp::admin_view::McpTrustView` and shaped like it on purpose: an
+// operator console rendering both planes should be rendering one component. It is NOT the same
+// type, because the two planes' capability vocabularies differ (a `tools:` entry has an approved
+// digest per tool; an `agents:` entry has a skill set on a card) and merging them would mean one
+// of the planes filling in fields that mean nothing to it.
+type A2aTrustView struct {
+	// Added Offered now, never ruled on.
+	Added []string `json:"added"`
+
+	// Changed Approved, but offered at a DIFFERENT digest. THIS IS THE RUG-PULL ROW.
+	Changed []string `json:"changed"`
+
+	// Failure Why the contact failed, when it did.
+	Failure *string `json:"failure"`
+
+	// Fingerprint THE CANONICAL CARD FINGERPRINT AN OPERATOR IS BEING ASKED TO APPROVE. Surfaced explicitly
+	// rather than left for a caller to dig out, because this is the one string that goes in front
+	// of the human and `approve` refuses anything else.
+	Fingerprint *string `json:"fingerprint"`
+	Name        string  `json:"name"`
+
+	// ObservedSkills How many skills the observation carried.
+	ObservedSkills uint `json:"observed_skills"`
+
+	// PinChanged The presented identity is not the locked one. Its own axis: adopting a new identity is a
+	// different act from adopting new content.
+	PinChanged bool `json:"pin_changed"`
+
+	// PinMechanism The operator's word for the authenticity root, as the OBSERVED pin names it. Never
+	// interpreted by the machine.
+	PinMechanism string `json:"pin_mechanism"`
+
+	// Removed Approved, and no longer offered.
+	Removed []string `json:"removed"`
+
+	// State `pending`, `approved`, `quarantined`, `suspended` or `error`. DERIVED on every read from the
+	// standing approval and the sighting, so there is no stored state to go stale.
+	State string `json:"state"`
+}
+
+// AdjustReq `POST /adjust`: a SIGNED correction to a key's COUNTS on the one ledger, never to a money
+// figure. It names the key, the lane the counts were earned on, the rate-card history entry they
+// were priced with, and the pool the unit was dispatched through.
+type AdjustReq struct {
+	// CardEpochMs The corrected unit's card epoch: its arrival instant, unix milliseconds. The correction
+	// lands in the budget windows, the card entry and the metering day holding it, never in those
+	// current when it is made, and `entry` must be the entry in force at it.
+	CardEpochMs uint64 `json:"card_epoch_ms"`
+
+	// Delta The signed delta per billable class: whole counts, never a money figure. At least one class.
+	Delta map[string]int64 `json:"delta"`
+
+	// Entry The rate-card history entry key the counts were priced with, as 40 hexadecimal digits.
+	Entry string `json:"entry"`
+
+	// Key The key whose counts are corrected.
+	Key string `json:"key"`
+
+	// Lane The lane (model) the counts were earned on.
+	Lane string `json:"lane"`
+
+	// Pool The pool the corrected unit was dispatched through. Required, and it must name a pool this
+	// node has configured: a pool-scoped group budget for that pool takes the correction as well
+	// as the group-wide budgets do.
+	Pool string `json:"pool"`
+
+	// Reason Why. Required and non-blank.
+	Reason string `json:"reason"`
+}
+
+// AdjustView `POST /adjust`'s answer: the correction as applied.
+type AdjustView struct {
+	// Applied Always true: a refused correction is a `400`, and nothing of it is applied.
+	Applied bool `json:"applied"`
+
+	// CardEpochMs The corrected unit's card epoch, unix milliseconds: where the correction landed.
+	CardEpochMs uint64 `json:"card_epoch_ms"`
+
+	// Delta The signed delta applied, per class.
+	Delta map[string]int64 `json:"delta"`
+
+	// Entry The rate-card history entry key, as 40 lowercase hexadecimal digits.
+	Entry string `json:"entry"`
+
+	// Key The key corrected.
+	Key string `json:"key"`
+
+	// Lane The lane corrected.
+	Lane string `json:"lane"`
+
+	// Pool The pool the correction names.
+	Pool string `json:"pool"`
 }
 
 // AdminAuthPutView `PUT /admin-auth`: the resource post-state (`{configured, modules}`, the same shape
@@ -102,16 +288,162 @@ type AdminAuthView struct {
 	Modules []string `json:"modules"`
 }
 
+// AmendRateHistoryReq `POST /ledger/amend-rate-history`: a back-dated correction to the dated rate-card
+// history. It out-ranks the entry it corrects and rewrites nothing.
+type AmendRateHistoryReq struct {
+	// EffectiveFrom The start of the corrected window, in the history's instant scale (milliseconds).
+	EffectiveFrom uint64 `json:"effective_from"`
+
+	// EffectiveUntil The end of the corrected window; when present it must lie strictly after
+	// `effective_from`. Absent or null: open-ended.
+	EffectiveUntil *uint64 `json:"effective_until,omitempty"`
+
+	// PerRequestFee The corrected flat per-request fee. Never negative.
+	PerRequestFee *uint64 `json:"per_request_fee,omitempty"`
+
+	// Rates The corrected rates. A correction must move at least one figure: a rate here or the fee.
+	Rates *[]AmendRateRow `json:"rates,omitempty"`
+
+	// Reason Why. Required and non-empty; the record keeps its SHA-256, not the text.
+	Reason string `json:"reason"`
+}
+
+// AmendRateHistoryView `POST /ledger/amend-rate-history`'s answer: the history entry an invoice will cite. It names no
+// figure — the corrected rates go into the card, never into the answer.
+type AmendRateHistoryView struct {
+	// AmendedAt When the correction was appended, in milliseconds.
+	AmendedAt      uint64  `json:"amended_at"`
+	EffectiveFrom  uint64  `json:"effective_from"`
+	EffectiveUntil *uint64 `json:"effective_until"`
+
+	// HistorySeq The history sequence number the correction was appended at.
+	HistorySeq uint64 `json:"history_seq"`
+
+	// ReasonSha256 The SHA-256 of the reason, as hex.
+	ReasonSha256 string `json:"reason_sha256"`
+}
+
+// AmendRateRow One corrected rate.
+type AmendRateRow struct {
+	// Class The billable class.
+	Class string `json:"class"`
+
+	// Lane The lane the rate is written against.
+	Lane string `json:"lane"`
+
+	// MicroPerUnit The rate, in micro-units per unit. Finite and non-negative.
+	MicroPerUnit float64 `json:"micro_per_unit"`
+}
+
+// Amount A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+// figure that silently lost its last digits would still look like money.
+type Amount = string
+
+// ApproveReq The `approve` request body. ONE required field, and it is required because it is the operator's
+// evidence that they looked.
+type ApproveReq struct {
+	// Fingerprint The canonical card fingerprint EXACTLY as `connect` reported it.
+	Fingerprint string `json:"fingerprint"`
+}
+
+// AuditChainHeadView `GET /audit/head`: where the audit record chain is now, and the recipe a verifier applies.
+type AuditChainHeadView struct {
+	// Algorithm The signature algorithm.
+	Algorithm string `json:"algorithm"`
+
+	// Head The tip, or null when the chain has sealed nothing (a true answer, not an error).
+	Head *AuditChainSignedHead `json:"head"`
+
+	// NextSeq The position the NEXT record will take.
+	NextSeq uint64 `json:"next_seq"`
+
+	// Recipe The name of the published digest recipe.
+	Recipe string `json:"recipe"`
+
+	// SignatureDomain The signature domain-separation string.
+	SignatureDomain string `json:"signature_domain"`
+}
+
+// AuditChainKeyView One published verifying key. Public halves only.
+type AuditChainKeyView struct {
+	Algorithm string `json:"algorithm"`
+	KeyId     string `json:"key_id"`
+
+	// PublicKey The verifying key, as hex.
+	PublicKey string `json:"public_key"`
+}
+
+// AuditChainKeysView `GET /audit/keys`: the public keys the chain is signed with.
+type AuditChainKeysView struct {
+	Algorithm string `json:"algorithm"`
+
+	// Keys Every public key this node signs records under; empty when it signs none.
+	Keys            []AuditChainKeyView `json:"keys"`
+	Recipe          string              `json:"recipe"`
+	SignatureDomain string              `json:"signature_domain"`
+}
+
+// AuditChainRangeView `GET /audit/range`: records by position, `from` through `to` inclusive, each carrying every
+// field its digest was taken over, plus the head this node published at or before `to`.
+type AuditChainRangeView struct {
+	Algorithm string `json:"algorithm"`
+
+	// Anchor The head published at or before `to`, or null when none was.
+	Anchor          *AuditChainSignedHead  `json:"anchor"`
+	From            uint64                 `json:"from"`
+	Recipe          string                 `json:"recipe"`
+	Records         []AuditChainRecordView `json:"records"`
+	SignatureDomain string                 `json:"signature_domain"`
+	To              uint64                 `json:"to"`
+}
+
+// AuditChainRecordView One sealed record: the digest recipe's fields, in the recipe's order (every value a string: a
+// text as its text, a number as its decimal text; each repeated group as an array under its own
+// name), then the record's digest and signature.
+type AuditChainRecordView struct {
+	Hash                 string                      `json:"hash"`
+	KeyId                *string                     `json:"key_id"`
+	Signature            *string                     `json:"signature"`
+	AdditionalProperties map[string]AuditRecipeValue `json:"-"`
+}
+
+// AuditChainSignedHead One signed head of the audit record chain.
+type AuditChainSignedHead struct {
+	// Hash The chain digest at that position.
+	Hash string `json:"hash"`
+
+	// KeyId Which key signed it, or null for an unsigned chain.
+	KeyId *string `json:"key_id"`
+
+	// Seq The chain position this head seals.
+	Seq uint64 `json:"seq"`
+
+	// Signature The head's signature, or null for an unsigned chain.
+	Signature *string `json:"signature"`
+
+	// Wall When the head was sealed, in whole seconds.
+	Wall uint64 `json:"wall"`
+}
+
 // AuditEntry One admin audit record. `outcome` is a stable token tooling can branch on. The record is
-// HASH-CHAINED for tamper-EVIDENCE: `hash = sha256(prev_hash | seq | ts | action | resource |
-// outcome | principal)`, and `prev_hash` is the preceding entry's `hash`. Recomputing the chain detects any
-// altered/reordered/deleted entry (detection, not prevention; a compromised host can still rewrite
-// the whole chain; prevention is shipping the log off-box to a SIEM).
+// HASH-CHAINED for tamper-EVIDENCE: `hash` is the SHA-256 of bytes fixed by this record's own
+// `scheme` (the recipe is on `hash`), and `prev_hash` is the preceding entry's `hash`. Recomputing
+// the chain detects any altered/reordered/deleted entry (detection, not prevention; a compromised
+// host can still rewrite the whole chain; prevention is shipping the log off-box to a SIEM).
 type AuditEntry struct {
 	// Action The action, `noun.verb` (e.g. `hook.register`, `hook.delete`).
 	Action string `json:"action"`
 
-	// Hash `sha256(prev_hash | seq | ts | action | resource | outcome | principal)`: the tamper-evidence digest.
+	// Hash The tamper-evidence digest: lowercase hex SHA-256 over the bytes this record's `scheme` names.
+	// Integers are written in decimal ASCII and strings as their UTF-8 bytes unless stated.
+	//
+	// Scheme 1: `prev_hash|seq|ts|action|resource|outcome|principal`, the fields joined by `|`
+	// (1.5.5's formula).
+	//
+	// Scheme 2: `prev_hash|seq` as in scheme 1, then one zero byte (0x00), then `ts`, `action`,
+	// `resource`, `outcome` and `principal`, each as its byte length (8 bytes, big-endian) followed
+	// by its bytes; `ts` is its 8-byte big-endian value, so its length is 8.
 	Hash string `json:"hash"`
 
 	// Outcome Stable outcome token: `applied` (mutation committed) | `rejected` (validation/conflict, nothing
@@ -130,6 +462,12 @@ type AuditEntry struct {
 	// Resource The resource acted on (e.g. `hook:compress`). Never a secret.
 	Resource string `json:"resource"`
 
+	// Scheme WHICH RECIPE `hash` was sealed under: 1 (the 1.5.5 pipe join) or 2 (length-prefixed fields);
+	// both are stated on `hash`. A record is sealed under 1 when its `action`, `resource` and
+	// `outcome` carry no `|`, and under 2 otherwise, so its fields always read back exactly. A
+	// record without this field is scheme 1. A verifier checks each record under its own scheme.
+	Scheme uint8 `json:"scheme"`
+
 	// Seq Monotonic sequence number (1-based), unique within a process lifetime.
 	Seq uint64 `json:"seq"`
 
@@ -143,6 +481,28 @@ type AuditPageView struct {
 	Items      []AuditEntry `json:"items"`
 	NextCursor *string      `json:"next_cursor"`
 }
+
+// AuditRecipeElement One element of a repeated group: a single value, or an object of the group's members.
+type AuditRecipeElement struct {
+	union json.RawMessage
+}
+
+// AuditRecipeElement1 defines model for AuditRecipeElement.1.
+type AuditRecipeElement1 map[string]AuditRecipeScalar
+
+// AuditRecipeScalar One recipe scalar, always a JSON string: a text field is its text, and a number field (an
+// unsigned 64-bit integer) is its canonical decimal text, because a JSON number above 2^53 is not
+// exact through a reader that maps numbers to doubles. Which framing a field takes is the
+// published recipe page's kind column, not the JSON type.
+type AuditRecipeScalar = string
+
+// AuditRecipeValue One digest-recipe value: a scalar, or a repeated group published as an array under its own name.
+type AuditRecipeValue struct {
+	union json.RawMessage
+}
+
+// AuditRecipeValue1 defines model for AuditRecipeValue.1.
+type AuditRecipeValue1 = []AuditRecipeElement
 
 // AuthView The ingress auth chain read (`GET /api/v1/admin/auth`): the ordered module names that authenticate
 // callers + the upstream-credential mode. Never a secret: module names and the mode are config
@@ -176,11 +536,50 @@ type CacheFlushView struct {
 	Flushed uint `json:"flushed"`
 }
 
+// ClassUsage One plane-declared class's consumption on a usage row: its raw count and its cost.
+//
+// NEW IN 1.6.0 (1.5.5's usage rows carried the token split alone, and 1.5.5 served no plane that
+// declares a class of its own): ledgered by the FLIP-A2A ruling. `cost` is in the same MICRO-units
+// as [`UsageBreakdown::spend_micros`], priced by the same card in force at the row's instant, and is
+// part of that row's `spend_micros`, never added to it a second time.
+type ClassUsage struct {
+	// Cost What the card in force priced that count at, in micro-units.
+	Cost int64 `json:"cost"`
+
+	// Count The raw count the plane's ledger lines recorded under the class.
+	Count uint64 `json:"count"`
+}
+
+// CommitUpgradeReq `POST /commit-upgrade`: the release the fleet commits to.
+type CommitUpgradeReq struct {
+	// Version The release this node runs. Any other is refused.
+	Version string `json:"version"`
+}
+
+// CommitUpgradeView `POST /commit-upgrade`'s answer: the committed release and the journal record that seals it.
+type CommitUpgradeView struct {
+	Committed string `json:"committed"`
+
+	// CommittedAt The arrival second.
+	CommittedAt uint64 `json:"committed_at"`
+
+	// Hash The record's chain hash.
+	Hash string `json:"hash"`
+
+	// Seq The record's position on the node journal.
+	Seq uint64 `json:"seq"`
+}
+
 // ConfigApplyView `POST /config/apply`: apply-a-full-config result. The change is live but not written to disk.
 type ConfigApplyView struct {
 	Applied       bool   `json:"applied"`
 	ConfigVersion uint64 `json:"config_version"`
 	Note          string `json:"note"`
+
+	// ReloadToApply The plane sections this configuration writes whose plane the process did not open at boot:
+	// a plane is opened once, at process start, when its section is configured, so each is stored
+	// and validated but serves nothing until the next RESTART. Omitted when none.
+	ReloadToApply *[]string `json:"reload_to_apply,omitempty"`
 }
 
 // ConfigDiffGlobalHooks The `global_hooks` delta of a `GET /config/diff`, present only when the global wiring changed.
@@ -212,7 +611,15 @@ type ConfigDiffView struct {
 // ConfigReloadView `POST /config/reload`: reload-from-disk result.
 type ConfigReloadView struct {
 	ConfigVersion uint64 `json:"config_version"`
-	Reloaded      bool   `json:"reloaded"`
+
+	// Note A human note naming the plane sections awaiting restart (omitted with them).
+	Note *string `json:"note,omitempty"`
+
+	// ReloadToApply The plane sections this configuration writes whose plane the process did not open at boot:
+	// a plane is opened once, at process start, when its section is configured, so each is stored
+	// and validated but serves nothing until the next RESTART. Omitted when none.
+	ReloadToApply *[]string `json:"reload_to_apply,omitempty"`
+	Reloaded      bool      `json:"reloaded"`
 }
 
 // ConfigRollbackView `POST /config/rollback`: restore-a-retained-version result (the restored version + the NEW
@@ -241,7 +648,13 @@ type ConfigRollbackView struct {
 // `upstream_request_timeout_secs`/`pool_max_idle_per_host`/`pool_idle_timeout_secs`, which the
 // reused `UpstreamClients` only reads once at boot, and `max_inbound_concurrent`, which is baked
 // once into the data router's `GlobalConcurrencyLimitLayer` at process start (a config apply swaps
-// only `Arc<App>`, never the router): two independent freezing mechanisms. There is NO
+// only `Arc<App>`, never the router): two independent freezing mechanisms.
+// The optional `limits.datagram_line_memory_bytes` setting is off by default. Setting it to
+// a positive integer enables a retained-capacity limit for new datagram LINE pairings; null
+// disables it. Existing connections retain their chosen limit. Exhaustion closes the affected
+// connection. The limit counts retained requested capacity across both directions, queued output
+// ownership and metadata, not process RSS or allocator overhead.
+// There is NO
 // `observability` section here, and no `metrics` one either: 1.5.3 DELETED both from the config
 // grammar, and `RootSettings` (what this endpoint projects) carries neither field: a PUT naming
 // `observability` is a loud `400` (`deny_unknown_fields`), never a silent no-op. All telemetry
@@ -339,6 +752,9 @@ type CreateKeyReq struct {
 	// AllowedPools Pools this key may target. OMITTED = ALL pools; an explicit `[]` = NO pools.
 	AllowedPools *[]string `json:"allowed_pools,omitempty"`
 
+	// Audience Optional exact resource audience for this bearer; omitted preserves ordinary key tokens.
+	Audience *string `json:"audience,omitempty"`
+
 	// ExpiresAt Token expiry as an absolute Unix-seconds timestamp. Mutually exclusive with `expires_in`.
 	ExpiresAt *uint64 `json:"expires_at,omitempty"`
 
@@ -428,6 +844,11 @@ type EffectiveConfigView struct {
 	Pools       []PoolView     `json:"pools"`
 	Providers   []ProviderView `json:"providers"`
 
+	// ReloadToApply The plane sections the running configuration writes whose plane the process did not open at
+	// boot: a plane is opened once, at process start, when its section is configured, so each is
+	// stored and validated but serves nothing until the next RESTART. Omitted when none.
+	ReloadToApply *[]string `json:"reload_to_apply,omitempty"`
+
 	// Version The monotonic config version at the time of this read (see `InfoView.config_version`), so a
 	// drift-detection read gets the config AND its version in one call.
 	Version uint64 `json:"version"`
@@ -472,8 +893,16 @@ type GroupBucketUsageView struct {
 	SpendCents int64 `json:"spend_cents"`
 
 	// Tokens Total tokens ledgered this window (all tiers).
-	Tokens    uint64  `json:"tokens"`
-	TokensCap *uint64 `json:"tokens_cap,omitempty"`
+	Tokens              uint64  `json:"tokens"`
+	TokensCacheReadCap  *uint64 `json:"tokens_cache_read_cap,omitempty"`
+	TokensCacheWriteCap *uint64 `json:"tokens_cache_write_cap,omitempty"`
+	TokensCap           *uint64 `json:"tokens_cap,omitempty"`
+
+	// TokensInputCap Per-tier token caps mirroring the cost tiers, when configured (absent = uncapped on that
+	// tier): `tokens_input` = uncached input, `tokens_output` = output, `tokens_cache_read`,
+	// `tokens_cache_write` = cache creation.
+	TokensInputCap  *uint64 `json:"tokens_input_cap,omitempty"`
+	TokensOutputCap *uint64 `json:"tokens_output_cap,omitempty"`
 
 	// Window The accounting window: `minute` | `hour` | `day` | `month` | `total`.
 	Window string `json:"window"`
@@ -520,6 +949,9 @@ type GroupView struct {
 	// root group. Skipped from the body when absent.
 	Parent *string `json:"parent,omitempty"`
 }
+
+// Hash A 32-byte digest as 64 lower-case hex characters.
+type Hash = string
 
 // HookDesiredStatus The DESIRED settings side of `hooks/{name}/status`: busbar's registry copy of the hook's settings
 // (KEY NAMES only, see [`super::HookView::settings_keys`]) and their version.
@@ -635,16 +1067,42 @@ type HookTransportView struct {
 // no `global_hooks:` config key to write: 1.5.3 deleted it, and a hook is now DEFINED once in the
 // top-level `hooks:` named map (its `module:` naming the `kind: hook` plugin that backs it) and
 // ATTACHED by bare name, at the reserved all-pools key `pools.hooks:`, which is what makes it
-// global, or at one pool's own `hooks:` list. `groups:` and `phase:` are the config-file selection
-// axes (which callers, which pipeline stages). On THIS API the same hook is written with
+// global, or at one pool's own `hooks:` list. On THIS API the same hook is written with
 // `global: true`; the wire and the config file are deliberately different surfaces. Live connection
 // status (`health`) is a separate endpoint. Additive-only.
+//
+// `groups:` and `phase:` are the config-file SELECTION axes (which callers, which pipeline stages),
+// and this view used to omit both. That was not a decision to keep them file-only: both are
+// WRITABLE over this API (`POST`/`PUT /hooks` deserialize `config::HookCfg` verbatim, which is the
+// documented "paste a `hooks:` entry" contract), so omitting them made a field an operator can set
+// through the API one they could not read back through it. `groups` and the stage pair
+// (`phase` + `fires_at`) close that.
 type HookView struct {
-	// At TAP observation stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or `None` for a gate.
+	// At The LEGACY single-valued tap stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or
+	// `null`. Kept for back-compat and NOT the field to read: `null` here does NOT mean "a gate"
+	// and does not mean "unscoped". Every hook written in the current top-level `hooks:` grammar
+	// has `at: null` by construction (`config::hook_cfg_from_def` never sets it, and
+	// `--migrate-config` rewrites a legacy `at:` into `phase:`), so this field is `null` for
+	// essentially every hook a running deployment has. Read `fires_at`.
+	// 1.6.0 owner rule: a 1.5.5 client reading this view must see this field byte-for-byte, so it
+	// is RESTORED alongside `phase`/`fires_at`.
 	At *string `json:"at"`
+
+	// FiresAt The RESOLVED stage set: the stages this hook ACTUALLY fires at, in pipeline order, never
+	// empty. This is the field that answers "when does this hook run", and it is computed by
+	// `config::HookCfg::resolved_stages` through the same `fires_at_stage` predicate the firing
+	// path uses, so it cannot disagree with runtime behavior. It reflects the frozen precedence
+	// (a non-empty `phase:` wins, else the legacy single `at:`, else the four core stages) without
+	// asking the reader to re-derive it from the two spellings above.
+	FiresAt []string `json:"fires_at"`
 
 	// Global Whether this hook fires on every request (globally wired).
 	Global bool `json:"global"`
+
+	// Groups The `groups:` CALLER SCOPE exactly as configured: the caller groups this hook fires for,
+	// empty meaning ALL callers (unscoped). The other half of "when does this hook run", and the
+	// same writable-but-unreadable gap `phase` had.
+	Groups []string `json:"groups"`
 
 	// Kind `"tap"` (fire-and-forget) or `"gate"` (fire-and-wait).
 	Kind string `json:"kind"`
@@ -656,6 +1114,12 @@ type HookView struct {
 	// are ILLEGAL hook names on every write path (`config::RESERVED_HOOK_NAMES`), so a value in
 	// the terminal set is always a terminal and anything else is always a hook reference.
 	OnError string `json:"on_error"`
+
+	// Phase The `phase:` STAGE LIST exactly as configured, empty when unset. The literal config echo,
+	// for an operator diffing what they wrote against what busbar parsed. It is NOT the effective
+	// answer on its own: empty means "fall back", and what it falls back TO is `at:` if set and the
+	// four core stages otherwise. For the effective answer read `fires_at`.
+	Phase []string `json:"phase"`
 
 	// Priority Rewrite/reject ordering key (transform-chain order + reject tie-break).
 	Priority uint16 `json:"priority"`
@@ -739,6 +1203,20 @@ type InstallPluginReq struct {
 	TarballB64 string `json:"tarball_b64"`
 }
 
+// ItemView A safe observation of custody. The raw payload and operator evidence stay in the Store.
+type ItemView struct {
+	BodyFingerprint string   `json:"body_fingerprint"`
+	CanResolve      bool     `json:"can_resolve"`
+	FirstSentAtMs   *uint64  `json:"first_sent_at_ms"`
+	Kind            KindView `json:"kind"`
+	OperationId     string   `json:"operation_id"`
+
+	// OwnerNode The foreign sender's node as exact lower-case hex; omitted for this node's own work.
+	OwnerNode       *string   `json:"owner_node,omitempty"`
+	RecoveryVersion uint64    `json:"recovery_version"`
+	State           StateView `json:"state"`
+}
+
 // KeyMeteringView `GET /keys/{id}/usage`: the key's all-time attribution counters (a 1.5.0 key bucket accrues in
 // the `total` window; limits live on the bound group's own windows) plus the fraction of the
 // tightest `requests`/`tokens` limit across the group chain remaining (`null` = no such limit).
@@ -769,7 +1247,11 @@ type KeyPageView struct {
 
 // KeyUsageView One key's row of the per-key aggregation: the key id/name (never the secret) + its counts.
 type KeyUsageView struct {
-	Id string `json:"id"`
+	// Classes THE PLANE-DECLARED CLASSES the row's ledger lines counted outside the token split, keyed by
+	// the class name the plane declares (new in 1.6.0, [`ClassUsage`]). Absent when the row carries
+	// none, so a token-only row reads exactly as 1.5.5's.
+	Classes *map[string]ClassUsage `json:"classes,omitempty"`
+	Id      string                 `json:"id"`
 
 	// Name The key's display name; `None` when the key was deleted after metering accumulated (history
 	// outlives the key; the id still attributes it).
@@ -818,6 +1300,254 @@ type KeyView struct {
 	State string `json:"state"`
 }
 
+// KindView defines model for KindView.
+type KindView string
+
+// LedgerChainHead One node's journal head, as a checkpoint sealed it.
+type LedgerChainHead struct {
+	// Hash A 32-byte digest as 64 lower-case hex characters.
+	Hash    Hash   `json:"hash"`
+	Node    uint64 `json:"node"`
+	NodeSeq uint64 `json:"node_seq"`
+}
+
+// LedgerCheckpoint One sealed checkpoint. `body_hash` is what an auditor re-derives independently;
+// `body_hash_verifies` is this node's own answer to the same question. A signature's presence is
+// reported and its bytes are not.
+type LedgerCheckpoint struct {
+	BackupWatermark uint64 `json:"backup_watermark"`
+
+	// BodyHash A 32-byte digest as 64 lower-case hex characters.
+	BodyHash Hash `json:"body_hash"`
+
+	// BodyHashVerifies This node's own answer to whether the sealed body re-hashes to `body_hash`.
+	BodyHashVerifies bool              `json:"body_hash_verifies"`
+	CheckpointSeq    uint64            `json:"checkpoint_seq"`
+	Heads            []LedgerChainHead `json:"heads"`
+	Node             uint64            `json:"node"`
+
+	// Signed Whether a signature is present. The signature's bytes are never served.
+	Signed            bool               `json:"signed"`
+	StoreSeqHighWater uint64             `json:"store_seq_high_water"`
+	Totals            []LedgerTotalsCell `json:"totals"`
+
+	// Wall When it was sealed, in whole seconds.
+	Wall uint64 `json:"wall"`
+}
+
+// LedgerCheckpoints `GET /ledger/checkpoints`: the sealed checkpoint figures, oldest first.
+type LedgerCheckpoints struct {
+	Checkpoints []LedgerCheckpoint `json:"checkpoints"`
+}
+
+// LedgerDiscrepancy One row on which the identity does not hold. Spend and fee count are checked separately
+// because they fail separately.
+type LedgerDiscrepancy struct {
+	Bucket string `json:"bucket"`
+	Day    uint64 `json:"day"`
+	Lane   string `json:"lane"`
+
+	// LedgerFeeCount What the ledger's postings charged fees for on this row.
+	LedgerFeeCount uint64 `json:"ledger_fee_count"`
+
+	// LegacyBillableRequests What the previous release's row says was billable.
+	LegacyBillableRequests uint64 `json:"legacy_billable_requests"`
+	Provider               string `json:"provider"`
+
+	// Residual The spend residual of one row.
+	Residual LedgerResidual `json:"residual"`
+}
+
+// LedgerMigration `GET /ledger/migration`: whether this deployment has migrated, and the marker if it has.
+// `migrated` is a field of its own rather than inferred from a null marker.
+type LedgerMigration struct {
+	Marker   *LedgerMigrationMarker `json:"marker"`
+	Migrated bool                   `json:"migrated"`
+}
+
+// LedgerMigrationMarker The marker the first boot after the upgrade sealed.
+type LedgerMigrationMarker struct {
+	// Balances How many balances the opening carries.
+	Balances uint64 `json:"balances"`
+
+	// BodyHash A 32-byte digest as 64 lower-case hex characters.
+	BodyHash Hash `json:"body_hash"`
+
+	// CellsRead How many of the previous release's cells were read to arrive at them.
+	CellsRead uint64 `json:"cells_read"`
+
+	// CheckpointSeq The checkpoint the migration sealed.
+	CheckpointSeq uint64 `json:"checkpoint_seq"`
+
+	// Node Which node sealed it.
+	Node uint64 `json:"node"`
+
+	// RateCardVersion Which card version the opening entries were priced under.
+	RateCardVersion uint64 `json:"rate_card_version"`
+
+	// SealedAt When, in whole seconds.
+	SealedAt uint64 `json:"sealed_at"`
+}
+
+// LedgerReconciliation `GET /ledger/reconciliation`: whether the ledger's postings reconcile with the previous
+// release's rows, and every row on which they do not.
+type LedgerReconciliation struct {
+	Discrepancies []LedgerDiscrepancy `json:"discrepancies"`
+
+	// Holds True when every row reconciles. `discrepancies` and `refused` are then empty.
+	Holds bool `json:"holds"`
+
+	// Refused Every balance whose counts a present rate card refused to price: its row is withheld from
+	// both sides of the identity, which was not measured over it. Empty is the good answer.
+	Refused []LedgerRefusedBalance `json:"refused"`
+}
+
+// LedgerRefusedBalance A balance with no figure: a unit's counts on it that the rate card in force refused to price
+// (a present card silent about the lane or a class). The row the balance folds into — the same
+// `bucket` and `day` — is withheld from the view that names this.
+type LedgerRefusedBalance struct {
+	// Bucket The balance's bucket.
+	Bucket string `json:"bucket"`
+
+	// Day The balance's window, as the unix second it opens at: the `day` of the withheld row.
+	Day uint64 `json:"day"`
+
+	// Dimension The balance's dimension.
+	Dimension string `json:"dimension"`
+
+	// Lane The lane that served the unit whose counts refused.
+	Lane string `json:"lane"`
+
+	// Refusal Why the pricing refused, in its own words.
+	Refusal string `json:"refusal"`
+
+	// Scope The balance's scope.
+	Scope string `json:"scope"`
+}
+
+// LedgerResidual The spend residual of one row.
+type LedgerResidual struct {
+	// Accounted Where the value the ledger drew is now.
+	Accounted Amount `json:"accounted"`
+
+	// Amount `accounted` minus `drawn`. Zero is the good answer; the sign says which side is missing the
+	// difference.
+	Amount Amount `json:"amount"`
+
+	// Drawn What the previous release's row records as taken.
+	Drawn Amount `json:"drawn"`
+}
+
+// LedgerTotals `GET /ledger/totals`: what the ledger's lines come to, per bucket, day, lane and provider.
+type LedgerTotals struct {
+	// Refused Every balance whose counts a present rate card refused to price: its row has no figure, so
+	// it is withheld from `rows` rather than served as the priced remainder. Empty is the good
+	// answer.
+	Refused []LedgerRefusedBalance `json:"refused"`
+
+	// Rows The rows, in bucket, day, lane and provider order. A row a `refused` entry names is absent.
+	Rows []LedgerTotalsRow `json:"rows"`
+}
+
+// LedgerTotalsCell One sealed balance, as the checkpoint holds it. Every money figure is an [`Amount`].
+type LedgerTotalsCell struct {
+	// Adjustments A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Adjustments Amount `json:"adjustments"`
+	Bucket      string `json:"bucket"`
+
+	// Budget A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Budget Amount `json:"budget"`
+
+	// CrossWindowTransfers A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	CrossWindowTransfers Amount `json:"cross_window_transfers"`
+	Dimension            string `json:"dimension"`
+
+	// Disputed A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Disputed Amount `json:"disputed"`
+
+	// Drawn A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Drawn                 Amount `json:"drawn"`
+	OldestDisputeAgeSecs  uint64 `json:"oldest_dispute_age_secs"`
+	OldestOpenHoldAgeSecs uint64 `json:"oldest_open_hold_age_secs"`
+	OpenDisputeCount      uint64 `json:"open_dispute_count"`
+
+	// OpenHolds A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	OpenHolds Amount `json:"open_holds"`
+
+	// OpenSliceRemainders A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	OpenSliceRemainders Amount `json:"open_slice_remainders"`
+
+	// OverdraftCarriedIn A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	OverdraftCarriedIn Amount `json:"overdraft_carried_in"`
+
+	// OverdraftCarriedOut A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	OverdraftCarriedOut Amount `json:"overdraft_carried_out"`
+
+	// Released A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Released Amount `json:"released"`
+	Scope    string `json:"scope"`
+
+	// Settled A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Settled Amount `json:"settled"`
+
+	// Unreconciled A money figure: a decimal integer carried as TEXT. The ledger keeps money in 128-bit integers and
+	// JSON's number is a double, exact only to 2^53; a nano-unit total passes that on a busy day, and a
+	// figure that silently lost its last digits would still look like money.
+	Unreconciled Amount `json:"unreconciled"`
+
+	// Window The window's opening instant, in whole seconds.
+	Window uint64 `json:"window"`
+}
+
+// LedgerTotalsRow One row of `GET /ledger/totals`. The row width is the reconciliation's, so a discrepancy found
+// on one endpoint is looked up on the other by the same four-part name.
+type LedgerTotalsRow struct {
+	// Bucket Whose budget the usage was attributed to.
+	Bucket string `json:"bucket"`
+
+	// Day The UTC-day bucket, as the unix second it opens at.
+	Day uint64 `json:"day"`
+
+	// FeeCount One per billable client request on this row.
+	FeeCount uint64 `json:"fee_count"`
+
+	// Lane The serving lane's configured model name (empty where the node keeps no finer width).
+	Lane string `json:"lane"`
+
+	// PricedMicros The same figure in micro-units: ONE truncating divide over the summed nano-units, never a
+	// sum of per-line divides.
+	PricedMicros Amount `json:"priced_micros"`
+
+	// PricedNanos The summed priced amount of the row's lines in nano-units, each line priced against the
+	// rate card in force at its own arrival instant.
+	PricedNanos Amount `json:"priced_nanos"`
+
+	// Provider The serving lane's provider (empty where the node keeps no finer width).
+	Provider string `json:"provider"`
+}
+
 // LimitView One limit inside a `GroupView`: an explicit `{ metric, amount, per, pool }` projection of a
 // config `LimitCfg`. The config file's compact `{ budget: 3000, per: month }` form is
 // deserialize-only sugar; the read API projects it explicitly so a consumer never has to know
@@ -844,11 +1574,96 @@ type LimitView struct {
 	Pool *string `json:"pool,omitempty"`
 }
 
+// ListRequest The bounded observation request. The cursor belongs only to this surface.
+type ListRequest struct {
+	Cursor *string `json:"cursor,omitempty"`
+	Limit  *uint   `json:"limit,omitempty"`
+}
+
+// ListView defines model for ListView.
+type ListView struct {
+	Items      []ItemView `json:"items"`
+	NextCursor *string    `json:"next_cursor"`
+}
+
+// McpCapabilityView ONE CAPABILITY'S STANDING STATUS, the three-way answer a trust view has to render.
+//
+// Three and not two: `approved at a digest`, `rejected`, and `allowed but never ruled on`. The
+// third is `pending` and it is the one a queue exists to drain, so collapsing it into "not
+// approved" would hide the operator's whole worklist.
+type McpCapabilityView struct {
+	// ApprovedDigest The digest the operator approved, when there is one. A rejected or pending capability has
+	// none, and reporting the last OBSERVED digest here would read as an approval.
+	ApprovedDigest *string `json:"approved_digest"`
+
+	// Status `approved`, `rejected` or `pending`.
+	Status string `json:"status"`
+
+	// Tool The bare tool name, as the upstream spells it.
+	Tool string `json:"tool"`
+}
+
+// McpHealthView THE HEALTH VIEW — `GET /tools/{name}/health`. Deliberately smaller than the trust view: health
+// answers "can busbar use this server right now, and if not why", and a dashboard polling it should
+// not be re-rendering the whole changes queue to find out.
+type McpHealthView struct {
+	// Contacted `false` until a refresh has ever landed. A server that has never been contacted is not
+	// unhealthy, and reporting it as such would page somebody for a declarative deployment.
+	Contacted     bool    `json:"contacted"`
+	Failure       *string `json:"failure"`
+	Name          string  `json:"name"`
+	ObservedTools uint    `json:"observed_tools"`
+
+	// Serving Whether this server currently SERVES: `state == approved`. Named separately from `state`
+	// because it is the one bit a caller usually wants and deriving it from a word is how a client
+	// ends up hard-coding a spelling.
+	Serving bool   `json:"serving"`
+	State   string `json:"state"`
+}
+
+// McpTrustView THE TRUST VIEW of one registered MCP server — `POST /tools/{name}/connect` and
+// `GET /tools/{name}/changes` answer with this.
+type McpTrustView struct {
+	// Added Offered now, never ruled on.
+	Added []string `json:"added"`
+
+	// Capabilities Every capability's standing status, in name order.
+	Capabilities []McpCapabilityView `json:"capabilities"`
+
+	// Changed Approved, but offered at a DIFFERENT digest. THIS IS THE RUG-PULL ROW.
+	Changed []string `json:"changed"`
+
+	// Failure Why the last contact failed, when it did.
+	Failure *string `json:"failure"`
+	Name    string  `json:"name"`
+
+	// ObservedTools How many tools the last successful observation carried.
+	ObservedTools uint `json:"observed_tools"`
+
+	// PinChanged The presented identity is not the locked one. Its own axis: adopting a new identity is a
+	// different act from adopting new content.
+	PinChanged bool `json:"pin_changed"`
+
+	// PinMechanism The operator's word for the authenticity root. Never interpreted by the machine.
+	PinMechanism string `json:"pin_mechanism"`
+
+	// Removed Approved, and no longer offered.
+	Removed []string `json:"removed"`
+
+	// State `pending`, `approved`, `quarantined`, `suspended` or `error`. DERIVED from the approval and
+	// the last sighting on every read, so there is no stored state to go stale.
+	State string `json:"state"`
+}
+
 // ModelUsageView One (model, provider) row of the per-model aggregation.
 type ModelUsageView struct {
-	Model    string `json:"model"`
-	Provider string `json:"provider"`
-	Requests uint64 `json:"requests"`
+	// Classes THE PLANE-DECLARED CLASSES the row's ledger lines counted outside the token split, keyed by
+	// the class name the plane declares (new in 1.6.0, [`ClassUsage`]). Absent when the row carries
+	// none, so a token-only row reads exactly as 1.5.5's.
+	Classes  *map[string]ClassUsage `json:"classes,omitempty"`
+	Model    string                 `json:"model"`
+	Provider string                 `json:"provider"`
+	Requests uint64                 `json:"requests"`
 
 	// SpendMicros Busbar's derived cost estimate in MICRO-units of the ABSTRACT cost unit (1e-6 unit -
 	// integer math, sub-cent precise, no float drift), recomputed at read time from the raw token
@@ -895,16 +1710,43 @@ type NamedDefView struct {
 	// puts a button on the hosted login page.
 	BrowserLoginConfigured *bool `json:"browser_login_configured,omitempty"`
 
-	// MaxAdminScope `identity-providers` ONLY: the per-provider ADMIN CEILING (`none` | `read-only` | `full`).
-	// `None` ⇒ the definition names none, so the most restrictive default applies. Omitted entirely
-	// for a section that carries no ceiling.
+	// FingerprintPinned `agents` ONLY: whether an approved card FINGERPRINT is pinned yet. A registration with a
+	// root but no fingerprint is the normal state of a fresh entry awaiting approval, and it is
+	// the state an operator most needs to be able to see.
+	FingerprintPinned *bool `json:"fingerprint_pinned,omitempty"`
+
+	// MaxAdminScope `identity-providers` ONLY: the per-provider ADMIN CEILING (`read-only` | `full`). There is no
+	// `none` token: `Scope::parse_ceiling` rejects it, because a ceiling
+	// caps what a grant can reach and cannot express the absence of one.
+	// `None` ⇒ the definition names no ceiling, so the most restrictive default applies. Omitted
+	// entirely for a section that carries no ceiling.
 	MaxAdminScope *string `json:"max_admin_scope,omitempty"`
 
 	// Module The `module:` backing this instance (a built-in name or a signed-plugin name/alias).
+	//
+	// ALWAYS present, matching 1.5.5's wire shape byte-for-byte (`required` includes `module`,
+	// schema type `"string"`, never nullable): 1.5.5 had no named-map section whose entries
+	// carried no module, so it has no representation for one, and the ruling is 1:1 with 1.5.5
+	// rather than inventing a new shape. EMPTY-STRINGED, not omitted, for a section whose entries
+	// are not plugin instances -- today `agents:`, whose entries describe endpoints somebody else
+	// runs (`NamedMapSection::requires_module`). Every section that HAS a module requires it to be
+	// non-empty, so an empty string is unambiguous for "no module" without a `skip_serializing_if`
+	// that would shrink `required` below 1.5.5's.
 	Module string `json:"module"`
 
 	// Name The instance NAME: the map key, and the token every reference site uses.
 	Name string `json:"name"`
+
+	// PinMechanism `agents` ONLY: which authenticity root this registration is pinned to (`jws_issuer_key` |
+	// `cert_spki` | `mtls` | `unpinned`). Projected because an operator scanning a registration
+	// list needs to SEE which entries have no root; a mechanism that could only be discovered by
+	// reading the config file is a mechanism nobody audits.
+	PinMechanism *string `json:"pin_mechanism,omitempty"`
+
+	// ReverifyTtl `agents` ONLY: the re-verification cadence this registration carries, as written. The
+	// backend `url:` is deliberately NOT projected here: it is the real remote endpoint and is
+	// never client-visible.
+	ReverifyTtl *string `json:"reverify_ttl,omitempty"`
 
 	// SettingsKeys The KEY NAMES of the module's opaque settings bag, sorted, WITHOUT their values, the
 	// redacted projection of `settings:`. Operator/API-owned and never interpreted here, but also
@@ -941,7 +1783,9 @@ type OverlayResetView struct {
 	Changed       bool   `json:"changed"`
 	ConfigVersion uint64 `json:"config_version"`
 
-	// Reset The section that was reset (`groups` | `hooks` | `root` | `plugin_versions`).
+	// Reset The section that was reset. This endpoint's `section` path parameter enumerates the valid
+	// set; it is deliberately not restated here, because the hand-written copy that used to sit on
+	// this line went stale the moment a section was added.
 	Reset string `json:"reset"`
 }
 
@@ -997,6 +1841,92 @@ type PageProviderView struct {
 // PatchSettingsReq The `PATCH /api/v1/admin/hooks/{name}/settings` body. Optimistic concurrency rides `If-Match`.
 type PatchSettingsReq struct {
 	Settings map[string]interface{} `json:"settings"`
+}
+
+// PendingRestartRemovalView Restart metadata returned when a stored removal cannot take full effect in this process.
+type PendingRestartRemovalView struct {
+	// Note The operator-facing explanation of the pending restart.
+	Note *string `json:"note"`
+
+	// ReloadToApply The boot-bound changes that require a process restart to take effect.
+	ReloadToApply []string `json:"reload_to_apply"`
+}
+
+// PlaneFactsClass One billable class a plane ledgers.
+type PlaneFactsClass struct {
+	Class  string `json:"class"`
+	Family string `json:"family"`
+}
+
+// PlaneFactsMetric One metric family a plane emits.
+type PlaneFactsMetric struct {
+	Kind      string   `json:"kind"`
+	LabelKeys []string `json:"label_keys"`
+	Name      string   `json:"name"`
+}
+
+// PlaneFactsServed One operation class a plane serves one level down.
+type PlaneFactsServed struct {
+	Name string `json:"name"`
+	Op   string `json:"op"`
+}
+
+// PlaneFactsView `GET /plane-facts`: what a plane this node serves declares about itself.
+type PlaneFactsView struct {
+	AdminNoun       string            `json:"admin_noun"`
+	AuditKind       string            `json:"audit_kind"`
+	BillableClasses []PlaneFactsClass `json:"billable_classes"`
+
+	// ConfigSection The config section whose presence declares the plane.
+	ConfigSection string `json:"config_section"`
+
+	// Fallback Whether it is the fallback catch-all plane.
+	Fallback            bool               `json:"fallback"`
+	FeeUnits            []string           `json:"fee_units"`
+	MetricFamilies      []PlaneFactsMetric `json:"metric_families"`
+	OwnedConfigSections []string           `json:"owned_config_sections"`
+
+	// Plane The plane's registry key.
+	Plane string `json:"plane"`
+
+	// RecordKinds The plane-record kinds the plane keeps; `POST /plane-record-write` writes only these.
+	RecordKinds     []string           `json:"record_kinds"`
+	ScopeKinds      []string           `json:"scope_kinds"`
+	ServedOpClasses []PlaneFactsServed `json:"served_op_classes"`
+	SubjectNoun     string             `json:"subject_noun"`
+}
+
+// PlaneRecordWriteReq `POST /plane-record-write`: one plane record, upserted by `(kind, id)`.
+type PlaneRecordWriteReq struct {
+	// Body The record's row, stored as its JSON bytes and never decoded by the store.
+	Body interface{} `json:"body"`
+
+	// Id The record's identity within its kind.
+	Id string `json:"id"`
+
+	// Kind The record kind.
+	Kind string `json:"kind"`
+
+	// Parent The parent the record hangs off, for a child kind.
+	Parent *string `json:"parent,omitempty"`
+
+	// Plane The key of a plane this node serves.
+	Plane string `json:"plane"`
+
+	// Terminal Whether retention may drop the record once it is old (default false).
+	Terminal *bool `json:"terminal,omitempty"`
+}
+
+// PlaneRecordWriteView `POST /plane-record-write`'s answer: what was written, and when.
+type PlaneRecordWriteView struct {
+	Id       string  `json:"id"`
+	Kind     string  `json:"kind"`
+	Parent   *string `json:"parent"`
+	Plane    string  `json:"plane"`
+	Terminal bool    `json:"terminal"`
+
+	// WrittenAt The arrival second the record was written at.
+	WrittenAt uint64 `json:"written_at"`
 }
 
 // PluginInstallView The result of installing a dynamic-library store plugin (`POST /api/v1/admin/plugins`). The
@@ -1279,6 +2209,30 @@ type PutAuthBody struct {
 	AdminAuth []string `json:"admin_auth"`
 }
 
+// ResolveRequest The immutable operation and recovery version inspected by the operator.
+type ResolveRequest struct {
+	// BackendQuiesced Explicitly attest that every outstanding backend mutation for this operation settled.
+	BackendQuiesced bool `json:"backend_quiesced"`
+
+	// BodyFingerprint The retained operation body's SHA-256 fingerprint as 64 lower-case hex characters.
+	BodyFingerprint string `json:"body_fingerprint"`
+
+	// OperationId The original operation id as 32 lower-case hexadecimal characters.
+	OperationId string `json:"operation_id"`
+
+	// Reason The evidence behind the explicit verdict; retained in the durable audit record.
+	Reason string `json:"reason"`
+
+	// RecoveryVersion The current recovery version; a stale observation is refused.
+	RecoveryVersion uint64 `json:"recovery_version"`
+
+	// SenderQuiesced Explicitly attest that every sender for this operation is retired or disarmed.
+	SenderQuiesced bool `json:"sender_quiesced"`
+
+	// Verdict An explicit operator observation of whether the retained operation landed.
+	Verdict Verdict `json:"verdict"`
+}
+
 // RestartReq The `POST /api/v1/admin/restart` body. Absent is the same as `{}`.
 type RestartReq struct {
 	// Confirm Proceed even though no supervisor was detected. Exiting only restarts busbar if something
@@ -1349,11 +2303,58 @@ type SigningKeyRotateView struct {
 	RevokeAll bool `json:"revoke_all"`
 }
 
+// StateView defines model for StateView.
+type StateView string
+
+// StoreRestoreReq `POST /store-restore`: the backup to restore. There is no default and no empty one.
+type StoreRestoreReq struct {
+	// BackupRef The backup the operator names. A request that names none is refused before the ceremony.
+	BackupRef string `json:"backup_ref"`
+}
+
 // TopologyInfo Pool/model/provider counts (`InfoView.topology`).
 type TopologyInfo struct {
 	Models    uint `json:"models"`
 	Pools     uint `json:"pools"`
 	Providers uint `json:"providers"`
+}
+
+// TrustKeyReq `POST /trust/approve` and `/trust/revoke`: the trust key decided.
+type TrustKeyReq struct {
+	// Key `<instance>/<counterparty>[/<item>]`, as `GET /trust` lists it.
+	Key string `json:"key"`
+}
+
+// TrustKeyView One trust key of the kernel's trust book and its state.
+type TrustKeyView struct {
+	// Approved What it is approved at: the catalogue hash, or the item's digest.
+	Approved *string `json:"approved"`
+
+	// Counterparty The counterparty, as the instance's configuration names it.
+	Counterparty string `json:"counterparty"`
+
+	// Instance The plane instance label.
+	Instance string `json:"instance"`
+
+	// Item The item at the counterparty, for an item key.
+	Item *string `json:"item"`
+
+	// Key The key, `<instance>/<counterparty>[/<item>]`: what `POST /trust/approve` and `/revoke` name.
+	Key string `json:"key"`
+
+	// Seen What it was last sighted at.
+	Seen *string `json:"seen"`
+
+	// State `new` (sighted and never approved, or revoked: refused), `approved` (approved, not sighted
+	// since), `same` (sighted as approved), `drifted` (sighted other than approved: refused until
+	// re-approved) or `quarantined` (the counterparty's catalogue moved: refused until re-approved).
+	State string `json:"state"`
+}
+
+// TrustListView `GET /trust`: every trust key and its state.
+type TrustListView struct {
+	// Keys Ordered by instance, counterparty and item, each counterparty before its items.
+	Keys []TrustKeyView `json:"keys"`
 }
 
 // UpdateKeyReq Partial update to an existing key. Keys are PURE AUTH (1.5.0), so the mutable surface is
@@ -1374,12 +2375,19 @@ type UpdateKeyReq struct {
 	// Group Rebind or UNBIND the key's group. Absent = unchanged; `null` = unbind. The double `Option`
 	// is what distinguishes those two, so the schema describes it as a nullable string.
 	Group *string `json:"group,omitempty"`
+
+	// GroupNull sends an explicit JSON null for group. It must not be combined with Group.
+	GroupNull bool `json:"-"`
 }
 
 // UsageBreakdown The raw consumption counts + the derived spend estimate: the one shape shared by `total`,
 // `by_model` rows, and `by_key` rows, so a consumer writes ONE aggregation reader.
 type UsageBreakdown struct {
-	Requests uint64 `json:"requests"`
+	// Classes THE PLANE-DECLARED CLASSES the row's ledger lines counted outside the token split, keyed by
+	// the class name the plane declares (new in 1.6.0, [`ClassUsage`]). Absent when the row carries
+	// none, so a token-only row reads exactly as 1.5.5's.
+	Classes  *map[string]ClassUsage `json:"classes,omitempty"`
+	Requests uint64                 `json:"requests"`
 
 	// SpendMicros Busbar's derived cost estimate in MICRO-units of the ABSTRACT cost unit (1e-6 unit -
 	// integer math, sub-cent precise, no float drift), recomputed at read time from the raw token
@@ -1421,6 +2429,11 @@ type UsageView struct {
 	// `total == sum(by_key) + others`).
 	Others *UsageBreakdown `json:"others,omitempty"`
 
+	// RateCardVersion The highest history entry key used to price this read, as 40 lowercase hexadecimal digits.
+	// Supplying this key as `?as_of` selects the same inclusive history-key boundary when an earlier
+	// entry arrives later. Null when no row was priced through dated history.
+	RateCardVersion *string `json:"rate_card_version"`
+
 	// Total The raw consumption counts + the derived spend estimate: the one shape shared by `total`,
 	// `by_model` rows, and `by_key` rows, so a consumer writes ONE aggregation reader.
 	Total UsageBreakdown `json:"total"`
@@ -1435,8 +2448,69 @@ type UsageWindow struct {
 	Start uint64 `json:"start"`
 }
 
+// Verdict An explicit operator observation of whether the retained operation landed.
+type Verdict string
+
+// VerifySince The checkpoint `verify` measured against.
+type VerifySince struct {
+	CheckpointSeq uint64 `json:"checkpoint_seq"`
+	Node          uint64 `json:"node"`
+
+	// Wall When it was sealed, in whole seconds.
+	Wall uint64 `json:"wall"`
+}
+
+// VerifyView `GET /verify`: everything that has to be true of this node's ledger, checked. A failed
+// verification is still a `200`; `ok` is the answer.
+type VerifyView struct {
+	// BookVerified Whether the book as it stands was measured against `since` (false with no checkpoint, or a
+	// node that binds no book).
+	BookVerified bool `json:"book_verified"`
+
+	// Checkpoints How many sealed checkpoints the node holds.
+	Checkpoints uint64 `json:"checkpoints"`
+
+	// Discrepancies How many rows do not reconcile (`GET /ledger/reconciliation` names them).
+	Discrepancies uint64 `json:"discrepancies"`
+
+	// Findings Each thing verification found, in words: a checkpoint edited after it was sealed, a node
+	// sequence that went backwards, a balance out of identity, a sealed balance no longer in the
+	// book, a closed window that moved, a balance whose counts the rate card refused to price.
+	Findings []string `json:"findings"`
+
+	// IdentityHolds Whether the ledger's postings reconcile with the previous release's rows.
+	IdentityHolds bool `json:"identity_holds"`
+
+	// Ok True when there is no finding and the identity holds.
+	Ok bool `json:"ok"`
+
+	// Since The checkpoint the book was verified against (the last sealed one); null when none is sealed.
+	Since *VerifySince `json:"since"`
+}
+
 // PutAdminAuthParams defines parameters for PutAdminAuth.
 type PutAdminAuthParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// DeleteAgentsNameParams defines parameters for DeleteAgentsName.
+type DeleteAgentsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PutAgentsNameJSONBody defines parameters for PutAgentsName.
+type PutAgentsNameJSONBody map[string]interface{}
+
+// PutAgentsNameParams defines parameters for PutAgentsName.
+type PutAgentsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PatchAgentsNameSettingsParams defines parameters for PatchAgentsNameSettings.
+type PatchAgentsNameSettingsParams struct {
 	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
 	IfMatch *string `json:"If-Match,omitempty"`
 }
@@ -1454,6 +2528,15 @@ type GetAuditParams struct {
 
 	// Cursor Opaque continuation cursor from `next_cursor`
 	Cursor *string `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// GetAuditRangeParams defines parameters for GetAuditRange.
+type GetAuditRangeParams struct {
+	// From The window's first position, inclusive. Both are required; `from` must not exceed `to`. A window running off either end of what the node holds is simply shorter.
+	From int `form:"from" json:"from"`
+
+	// To The window's last position, inclusive. Both are required; `from` must not exceed `to`. A window running off either end of what the node holds is simply shorter.
+	To int `form:"to" json:"to"`
 }
 
 // PostConfigApplyJSONBody defines parameters for PostConfigApply.
@@ -1681,6 +2764,12 @@ type DeleteOverlaySectionParams struct {
 // DeleteOverlaySectionParamsSection defines parameters for DeleteOverlaySection.
 type DeleteOverlaySectionParamsSection string
 
+// GetPlaneFactsParams defines parameters for GetPlaneFacts.
+type GetPlaneFactsParams struct {
+	// Plane The registry key of a plane this node serves.
+	Plane string `form:"plane" json:"plane"`
+}
+
 // GetPluginsParams defines parameters for GetPlugins.
 type GetPluginsParams struct {
 	// Type Plugin type: `auth` | `hooks` | `store` (required)
@@ -1699,17 +2788,56 @@ type GetPoolsParams struct {
 	Detail *string `form:"detail,omitempty" json:"detail,omitempty"`
 }
 
+// DeleteToolsNameParams defines parameters for DeleteToolsName.
+type DeleteToolsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PutToolsNameJSONBody defines parameters for PutToolsName.
+type PutToolsNameJSONBody map[string]interface{}
+
+// PutToolsNameParams defines parameters for PutToolsName.
+type PutToolsNameParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
+// PatchToolsNameSettingsParams defines parameters for PatchToolsNameSettings.
+type PatchToolsNameSettingsParams struct {
+	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // GetUsageParams defines parameters for GetUsage.
 type GetUsageParams struct {
 	// Window A PAST UTC-day bucket start epoch (default: current bucket). The response is always ONE bucket; spend_micros is a read-time estimate; bill from the raw token split, never store spend_micros as a ledger charge
 	Window *string `form:"window,omitempty" json:"window,omitempty"`
+
+	// AsOf A known rate-card history entry key as 40 hexadecimal digits (default: the history as it stands). Each row is priced at its own instant through the inclusive key boundary, which remains stable when earlier entries arrive. Unknown keys and numeric list positions are refused. Distinct from the numeric `as_of` FIELD in the response, which is the instant the read was taken
+	AsOf *string `form:"as_of,omitempty" json:"as_of,omitempty"`
 }
+
+// PostAdjustJSONRequestBody defines body for PostAdjust for application/json ContentType.
+type PostAdjustJSONRequestBody = AdjustReq
 
 // PutAdminAuthJSONRequestBody defines body for PutAdminAuth for application/json ContentType.
 type PutAdminAuthJSONRequestBody = PutAuthBody
 
+// PutAgentsNameJSONRequestBody defines body for PutAgentsName for application/json ContentType.
+type PutAgentsNameJSONRequestBody PutAgentsNameJSONBody
+
+// PostAgentsNameApproveJSONRequestBody defines body for PostAgentsNameApprove for application/json ContentType.
+type PostAgentsNameApproveJSONRequestBody = ApproveReq
+
+// PatchAgentsNameSettingsJSONRequestBody defines body for PatchAgentsNameSettings for application/json ContentType.
+type PatchAgentsNameSettingsJSONRequestBody = NamedSettingsReq
+
 // PostAuthCacheFlushJSONRequestBody defines body for PostAuthCacheFlush for application/json ContentType.
 type PostAuthCacheFlushJSONRequestBody = FlushCacheReq
+
+// PostCommitUpgradeJSONRequestBody defines body for PostCommitUpgrade for application/json ContentType.
+type PostCommitUpgradeJSONRequestBody = CommitUpgradeReq
 
 // PostConfigApplyJSONRequestBody defines body for PostConfigApply for application/json ContentType.
 type PostConfigApplyJSONRequestBody PostConfigApplyJSONBody
@@ -1759,6 +2887,18 @@ type PostKeysJSONRequestBody = CreateKeyReq
 // PatchKeysIdJSONRequestBody defines body for PatchKeysId for application/json ContentType.
 type PatchKeysIdJSONRequestBody = UpdateKeyReq
 
+// PostLedgerAmendRateHistoryJSONRequestBody defines body for PostLedgerAmendRateHistory for application/json ContentType.
+type PostLedgerAmendRateHistoryJSONRequestBody = AmendRateHistoryReq
+
+// PostLedgerRecoveryListJSONRequestBody defines body for PostLedgerRecoveryList for application/json ContentType.
+type PostLedgerRecoveryListJSONRequestBody = ListRequest
+
+// PostLedgerRecoveryResolveJSONRequestBody defines body for PostLedgerRecoveryResolve for application/json ContentType.
+type PostLedgerRecoveryResolveJSONRequestBody = ResolveRequest
+
+// PostPlaneRecordWriteJSONRequestBody defines body for PostPlaneRecordWrite for application/json ContentType.
+type PostPlaneRecordWriteJSONRequestBody = PlaneRecordWriteReq
+
 // PostPluginsJSONRequestBody defines body for PostPlugins for application/json ContentType.
 type PostPluginsJSONRequestBody = InstallPluginReq
 
@@ -1770,6 +2910,237 @@ type PostPluginsRollbackJSONRequestBody = PluginRollbackReq
 
 // PostRestartJSONRequestBody defines body for PostRestart for application/json ContentType.
 type PostRestartJSONRequestBody = RestartReq
+
+// PostStoreRestoreJSONRequestBody defines body for PostStoreRestore for application/json ContentType.
+type PostStoreRestoreJSONRequestBody = StoreRestoreReq
+
+// PutToolsNameJSONRequestBody defines body for PutToolsName for application/json ContentType.
+type PutToolsNameJSONRequestBody PutToolsNameJSONBody
+
+// PatchToolsNameSettingsJSONRequestBody defines body for PatchToolsNameSettings for application/json ContentType.
+type PatchToolsNameSettingsJSONRequestBody = NamedSettingsReq
+
+// PostTrustApproveJSONRequestBody defines body for PostTrustApprove for application/json ContentType.
+type PostTrustApproveJSONRequestBody = TrustKeyReq
+
+// PostTrustRevokeJSONRequestBody defines body for PostTrustRevoke for application/json ContentType.
+type PostTrustRevokeJSONRequestBody = TrustKeyReq
+
+// Getter for additional properties for AuditChainRecordView. Returns the specified
+// element and whether it was found
+func (a AuditChainRecordView) Get(fieldName string) (value AuditRecipeValue, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for AuditChainRecordView
+func (a *AuditChainRecordView) Set(fieldName string, value AuditRecipeValue) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]AuditRecipeValue)
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for AuditChainRecordView to handle AdditionalProperties
+func (a *AuditChainRecordView) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["hash"]; found {
+		err = json.Unmarshal(raw, &a.Hash)
+		if err != nil {
+			return fmt.Errorf("error reading 'hash': %w", err)
+		}
+		delete(object, "hash")
+	}
+
+	if raw, found := object["key_id"]; found {
+		err = json.Unmarshal(raw, &a.KeyId)
+		if err != nil {
+			return fmt.Errorf("error reading 'key_id': %w", err)
+		}
+		delete(object, "key_id")
+	}
+
+	if raw, found := object["signature"]; found {
+		err = json.Unmarshal(raw, &a.Signature)
+		if err != nil {
+			return fmt.Errorf("error reading 'signature': %w", err)
+		}
+		delete(object, "signature")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]AuditRecipeValue)
+		for fieldName, fieldBuf := range object {
+			var fieldVal AuditRecipeValue
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for AuditChainRecordView to handle AdditionalProperties
+func (a AuditChainRecordView) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	object["hash"], err = json.Marshal(a.Hash)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'hash': %w", err)
+	}
+
+	object["key_id"], err = json.Marshal(a.KeyId)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'key_id': %w", err)
+	}
+
+	object["signature"], err = json.Marshal(a.Signature)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'signature': %w", err)
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}
+
+// AsAuditRecipeScalar returns the union data inside the AuditRecipeElement as a AuditRecipeScalar
+func (t AuditRecipeElement) AsAuditRecipeScalar() (AuditRecipeScalar, error) {
+	var body AuditRecipeScalar
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAuditRecipeScalar overwrites any union data inside the AuditRecipeElement as the provided AuditRecipeScalar
+func (t *AuditRecipeElement) FromAuditRecipeScalar(v AuditRecipeScalar) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAuditRecipeScalar performs a merge with any union data inside the AuditRecipeElement, using the provided AuditRecipeScalar
+func (t *AuditRecipeElement) MergeAuditRecipeScalar(v AuditRecipeScalar) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAuditRecipeElement1 returns the union data inside the AuditRecipeElement as a AuditRecipeElement1
+func (t AuditRecipeElement) AsAuditRecipeElement1() (AuditRecipeElement1, error) {
+	var body AuditRecipeElement1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAuditRecipeElement1 overwrites any union data inside the AuditRecipeElement as the provided AuditRecipeElement1
+func (t *AuditRecipeElement) FromAuditRecipeElement1(v AuditRecipeElement1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAuditRecipeElement1 performs a merge with any union data inside the AuditRecipeElement, using the provided AuditRecipeElement1
+func (t *AuditRecipeElement) MergeAuditRecipeElement1(v AuditRecipeElement1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AuditRecipeElement) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AuditRecipeElement) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsAuditRecipeScalar returns the union data inside the AuditRecipeValue as a AuditRecipeScalar
+func (t AuditRecipeValue) AsAuditRecipeScalar() (AuditRecipeScalar, error) {
+	var body AuditRecipeScalar
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAuditRecipeScalar overwrites any union data inside the AuditRecipeValue as the provided AuditRecipeScalar
+func (t *AuditRecipeValue) FromAuditRecipeScalar(v AuditRecipeScalar) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAuditRecipeScalar performs a merge with any union data inside the AuditRecipeValue, using the provided AuditRecipeScalar
+func (t *AuditRecipeValue) MergeAuditRecipeScalar(v AuditRecipeScalar) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAuditRecipeValue1 returns the union data inside the AuditRecipeValue as a AuditRecipeValue1
+func (t AuditRecipeValue) AsAuditRecipeValue1() (AuditRecipeValue1, error) {
+	var body AuditRecipeValue1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromAuditRecipeValue1 overwrites any union data inside the AuditRecipeValue as the provided AuditRecipeValue1
+func (t *AuditRecipeValue) FromAuditRecipeValue1(v AuditRecipeValue1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAuditRecipeValue1 performs a merge with any union data inside the AuditRecipeValue, using the provided AuditRecipeValue1
+func (t *AuditRecipeValue) MergeAuditRecipeValue1(v AuditRecipeValue1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t AuditRecipeValue) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *AuditRecipeValue) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
 
 // RequestEditorFn is the function signature for the RequestEditor callback function
 type RequestEditorFn func(ctx context.Context, req *http.Request) error
@@ -1819,7 +3190,7 @@ func NewClient(server string, opts ...ClientOption) (*Client, error) {
 	}
 	// create httpClient, if not already present
 	if client.Client == nil {
-		client.Client = &http.Client{}
+		client.Client = newDefaultHTTPClient()
 	}
 	return &client, nil
 }
@@ -1845,6 +3216,24 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
+	// PostAdjustWithBody Correct a key's COUNTS by a signed delta, never a money figure
+	//
+	// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+	PostAdjustWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAdjust Correct a key's COUNTS by a signed delta, never a money figure
+	//
+	// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+	PostAdjust(ctx context.Context, body PostAdjustJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetAdminAuth Admin-plane auth config (the admin surface guard)
 	//
 	// Corresponds with GET /api/v1/admin/admin-auth (the `GetAdminAuth` operationId).
@@ -1864,10 +3253,93 @@ type ClientInterface interface {
 	// Corresponds with PUT /api/v1/admin/admin-auth (the `PutAdminAuth` operationId).
 	PutAdminAuth(ctx context.Context, params *PutAdminAuthParams, body PutAdminAuthJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAgents Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+	GetAgents(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteAgentsName Remove one `agents:` definition, refused while another config section still references it by bare name
+	//
+	// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+	DeleteAgentsName(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgentsName One `agents:` definition
+	//
+	// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+	GetAgentsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutAgentsNameWithBody Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsNameWithBody(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutAgentsName Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsName(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAgentsNameApproveWithBody Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApproveWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAgentsNameApprove Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApprove(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostAgentsNameConnect Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing; the card it verified is recorded as the agent's card records, which an instance opened again serves from
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+	PostAgentsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchAgentsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettingsWithBody(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchAgentsNameSettings Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettings(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetAudit Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
 	//
 	// Corresponds with GET /api/v1/admin/audit (the `GetAudit` operationId).
 	GetAudit(ctx context.Context, params *GetAuditParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuditHead The audit record chain's tip: position, digest, signature, key identifier and clock
+	//
+	// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+	//
+	// Corresponds with GET /api/v1/admin/audit/head (the `GetAuditHead` operationId).
+	GetAuditHead(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuditKeys The public keys the audit chain is signed with
+	//
+	// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+	//
+	// Corresponds with GET /api/v1/admin/audit/keys (the `GetAuditKeys` operationId).
+	GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAuditRange Audit records by position, each with every field its digest was taken over
+	//
+	// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+	//
+	// Corresponds with GET /api/v1/admin/audit/range (the `GetAuditRange` operationId).
+	GetAuditRange(ctx context.Context, params *GetAuditRangeParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetAuth Ingress auth chain + upstream-credential mode
 	//
@@ -1887,6 +3359,31 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /api/v1/admin/auth/cache/flush (the `PostAuthCacheFlush` operationId).
 	PostAuthCacheFlush(ctx context.Context, body PostAuthCacheFlushJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostChainBreak Deliberately break the journal chain (disaster recovery)
+	//
+	// Admitted through the same gates as every other new verb, then handed to the store. The request body is not read.
+	//
+	// Corresponds with POST /api/v1/admin/chain-break (the `PostChainBreak` operationId).
+	PostChainBreak(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostCommitUpgradeWithBody Commit the fleet to the release this node runs
+	//
+	// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+	PostCommitUpgradeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostCommitUpgrade Commit the fleet to the release this node runs
+	//
+	// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+	PostCommitUpgrade(ctx context.Context, body PostCommitUpgradeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetConfig Effective running config snapshot (redacted)
 	//
@@ -1989,14 +3486,14 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/export/{name} (the `GetExportName` operationId).
 	GetExportName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutExportNameWithBody Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	// PutExportNameWithBody Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
 	PutExportNameWithBody(ctx context.Context, name string, params *PutExportNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutExportName Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	// PutExportName Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2166,14 +3663,14 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/identity-providers/{name} (the `GetIdentityProvidersName` operationId).
 	GetIdentityProvidersName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutIdentityProvidersNameWithBody Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	// PutIdentityProvidersNameWithBody Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
 	PutIdentityProvidersNameWithBody(ctx context.Context, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutIdentityProvidersName Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	// PutIdentityProvidersName Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2257,6 +3754,95 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/keys/{id}/usage (the `GetKeysIdUsage` operationId).
 	GetKeysIdUsage(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostLedgerAmendRateHistoryWithBody Append a back-dated correction to the dated rate-card history
+	//
+	// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+	PostLedgerAmendRateHistoryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerAmendRateHistory Append a back-dated correction to the dated rate-card history
+	//
+	// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+	PostLedgerAmendRateHistory(ctx context.Context, body PostLedgerAmendRateHistoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerCheckpoints The sealed checkpoint figures
+	//
+	// Money is the one ledger's counts x the rate card, recomputed on every read, so no balance checkpoint is sealed and the list is empty. The shape is kept for clients that read it. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Corresponds with GET /api/v1/admin/ledger/checkpoints (the `GetLedgerCheckpoints` operationId).
+	GetLedgerCheckpoints(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerMigration The marker the first boot after the upgrade sealed
+	//
+	// The previous release's rows ARE the one ledger's counts, read as they are, so no migration is sealed: `migrated` is false and `marker` null. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Corresponds with GET /api/v1/admin/ledger/migration (the `GetLedgerMigration` operationId).
+	GetLedgerMigration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerOpenapiJson The full administrative OpenAPI 3.1 document, served at the ledger's own path
+	//
+	// The committed, generated document, unfiltered: every operation this BUILD can serve, including each plane's. `GET /openapi.json` serves the same document filtered to the planes this node configured.
+	//
+	// Corresponds with GET /api/v1/admin/ledger/openapi.json (the `GetLedgerOpenapiJson` operationId).
+	GetLedgerOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerReconciliation Whether the one ledger prices whole
+	//
+	// There is one ledger, so there is no second set of figures to be out by: `discrepancies` is always empty, and `holds` is true unless a key's counts the rate card refused to price are named under `refused`. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Corresponds with GET /api/v1/admin/ledger/reconciliation (the `GetLedgerReconciliation` operationId).
+	GetLedgerReconciliation(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerRecoveryListWithBody Inspect retained raw ledger operations requiring recovery
+	//
+	// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+	PostLedgerRecoveryListWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerRecoveryList Inspect retained raw ledger operations requiring recovery
+	//
+	// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+	PostLedgerRecoveryList(ctx context.Context, body PostLedgerRecoveryListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerRecoveryResolveWithBody Record an explicit landed or not-landed verdict for an exact retained operation
+	//
+	// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+	PostLedgerRecoveryResolveWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostLedgerRecoveryResolve Record an explicit landed or not-landed verdict for an exact retained operation
+	//
+	// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+	PostLedgerRecoveryResolve(ctx context.Context, body PostLedgerRecoveryResolveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetLedgerTotals What the one ledger's counts come to, per key
+	//
+	// Each key's usage counts priced by the one function against the rate card each era was earned under — the figure `GET /keys/{id}/usage` derives. A key whose counts the rate card refused to price is withheld and named under `refused`; every other key with anything counted is served. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Corresponds with GET /api/v1/admin/ledger/totals (the `GetLedgerTotals` operationId).
+	GetLedgerTotals(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetModels Model lanes + upstream providers
 	//
 	// Corresponds with GET /api/v1/admin/models (the `GetModels` operationId).
@@ -2267,10 +3853,35 @@ type ClientInterface interface {
 	// Corresponds with GET /api/v1/admin/openapi.json (the `GetOpenapiJson` operationId).
 	GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+	// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 	//
 	// Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 	DeleteOverlaySection(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPlaneFacts What a plane this node serves declares about itself
+	//
+	// The plane's registry key, config sections, grant kinds, nouns, billable classes, fee units, metric families and served operation classes. A read: it mutates nothing and needs `read-only`.
+	//
+	// Corresponds with GET /api/v1/admin/plane-facts (the `GetPlaneFacts` operationId).
+	GetPlaneFacts(ctx context.Context, params *GetPlaneFactsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostPlaneRecordWriteWithBody Upsert one record of a plane this node serves
+	//
+	// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+	PostPlaneRecordWriteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostPlaneRecordWrite Upsert one record of a plane this node serves
+	//
+	// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+	PostPlaneRecordWrite(ctx context.Context, body PostPlaneRecordWriteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetPlugins Plugin catalog by type (compiled-in + external + dynamic-library)
 	//
@@ -2368,10 +3979,174 @@ type ClientInterface interface {
 	// Corresponds with POST /api/v1/admin/signing-key/rotate (the `PostSigningKeyRotate` operationId).
 	PostSigningKeyRotate(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PostStoreRestoreWithBody Refused: the configured store has no restore operation (disaster recovery)
+	//
+	// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+	PostStoreRestoreWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostStoreRestore Refused: the configured store has no restore operation (disaster recovery)
+	//
+	// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+	PostStoreRestore(ctx context.Context, body PostStoreRestoreJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTools Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+	GetTools(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteToolsName Remove one `tools:` definition, refused while another config section still references it by bare name
+	//
+	// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+	DeleteToolsName(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolsName One `tools:` definition
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+	GetToolsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutToolsNameWithBody Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsNameWithBody(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutToolsName Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsName(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolsNameChanges The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+	GetToolsNameChanges(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostToolsNameConnect Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+	//
+	// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+	PostToolsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetToolsNameHealth Whether one MCP server currently serves, and why not when it does not
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+	GetToolsNameHealth(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchToolsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettingsWithBody(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PatchToolsNameSettings Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettings(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTrust Every trust key of the kernel's trust book and its state
+	//
+	// The counterparties every plane instance this node serves declares, and the items sighted or approved at each: its key, state, what it is approved at and what it was last sighted at. A read: it mutates nothing and needs `read-only`.
+	//
+	// Corresponds with GET /api/v1/admin/trust (the `GetTrust` operationId).
+	GetTrust(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostTrustApproveWithBody Approve one trust key at what it was last sighted at
+	//
+	// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+	PostTrustApproveWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostTrustApprove Approve one trust key at what it was last sighted at
+	//
+	// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+	PostTrustApprove(ctx context.Context, body PostTrustApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostTrustRevokeWithBody Revoke one trust key
+	//
+	// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+	PostTrustRevokeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PostTrustRevoke Revoke one trust key
+	//
+	// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+	PostTrustRevoke(ctx context.Context, body PostTrustRevokeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetUsage Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 	//
 	// Corresponds with GET /api/v1/admin/usage (the `GetUsage` operationId).
 	GetUsage(ctx context.Context, params *GetUsageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetVerify Verify this node's ledger: checkpoints, sequences, the book and the identity
+	//
+	// Every sealed checkpoint must re-hash to its own body, no node's sequence may go backwards between two checkpoints, the book as it stands is measured against the last checkpoint, and the ledger's postings must reconcile with the previous release's rows. A failed verification is still a 200: `ok` is the answer and `findings` says why. A read: it mutates nothing and needs `read-only`.
+	//
+	// Corresponds with GET /api/v1/admin/verify (the `GetVerify` operationId).
+	GetVerify(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// PostAdjustWithBody Correct a key's COUNTS by a signed delta, never a money figure
+//
+// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+func (c *Client) PostAdjustWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAdjustRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAdjust Correct a key's COUNTS by a signed delta, never a money figure
+//
+// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+func (c *Client) PostAdjust(ctx context.Context, body PostAdjustJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAdjustRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
 }
 
 // GetAdminAuth Admin-plane auth config (the admin surface guard)
@@ -2423,11 +4198,224 @@ func (c *Client) PutAdminAuth(ctx context.Context, params *PutAdminAuthParams, b
 	return c.Client.Do(req)
 }
 
+// GetAgents Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+func (c *Client) GetAgents(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteAgentsName Remove one `agents:` definition, refused while another config section still references it by bare name
+//
+// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+func (c *Client) DeleteAgentsName(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteAgentsNameRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAgentsName One `agents:` definition
+//
+// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+func (c *Client) GetAgentsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentsNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutAgentsNameWithBody Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *Client) PutAgentsNameWithBody(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutAgentsNameRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutAgentsName Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *Client) PutAgentsName(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutAgentsNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAgentsNameApproveWithBody Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *Client) PostAgentsNameApproveWithBody(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAgentsNameApproveRequestWithBody(c.Server, name, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAgentsNameApprove Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *Client) PostAgentsNameApprove(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAgentsNameApproveRequest(c.Server, name, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostAgentsNameConnect Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing; the card it verified is recorded as the agent's card records, which an instance opened again serves from
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+func (c *Client) PostAgentsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostAgentsNameConnectRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchAgentsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *Client) PatchAgentsNameSettingsWithBody(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchAgentsNameSettingsRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchAgentsNameSettings Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *Client) PatchAgentsNameSettings(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchAgentsNameSettingsRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetAudit Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
 //
 // Corresponds with GET /api/v1/admin/audit (the `GetAudit` operationId).
 func (c *Client) GetAudit(ctx context.Context, params *GetAuditParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAuditRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuditHead The audit record chain's tip: position, digest, signature, key identifier and clock
+//
+// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+//
+// Corresponds with GET /api/v1/admin/audit/head (the `GetAuditHead` operationId).
+func (c *Client) GetAuditHead(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditHeadRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuditKeys The public keys the audit chain is signed with
+//
+// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+//
+// Corresponds with GET /api/v1/admin/audit/keys (the `GetAuditKeys` operationId).
+func (c *Client) GetAuditKeys(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditKeysRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetAuditRange Audit records by position, each with every field its digest was taken over
+//
+// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+//
+// Corresponds with GET /api/v1/admin/audit/range (the `GetAuditRange` operationId).
+func (c *Client) GetAuditRange(ctx context.Context, params *GetAuditRangeParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAuditRangeRequest(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2477,6 +4465,61 @@ func (c *Client) PostAuthCacheFlushWithBody(ctx context.Context, contentType str
 // Corresponds with POST /api/v1/admin/auth/cache/flush (the `PostAuthCacheFlush` operationId).
 func (c *Client) PostAuthCacheFlush(ctx context.Context, body PostAuthCacheFlushJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewPostAuthCacheFlushRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostChainBreak Deliberately break the journal chain (disaster recovery)
+//
+// Admitted through the same gates as every other new verb, then handed to the store. The request body is not read.
+//
+// Corresponds with POST /api/v1/admin/chain-break (the `PostChainBreak` operationId).
+func (c *Client) PostChainBreak(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostChainBreakRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostCommitUpgradeWithBody Commit the fleet to the release this node runs
+//
+// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+func (c *Client) PostCommitUpgradeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostCommitUpgradeRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostCommitUpgrade Commit the fleet to the release this node runs
+//
+// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+func (c *Client) PostCommitUpgrade(ctx context.Context, body PostCommitUpgradeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostCommitUpgradeRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2758,7 +4801,7 @@ func (c *Client) GetExportName(ctx context.Context, name string, reqEditors ...R
 	return c.Client.Do(req)
 }
 
-// PutExportNameWithBody Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+// PutExportNameWithBody Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 //
 // Takes any type of body and a specified content type.
 //
@@ -2775,7 +4818,7 @@ func (c *Client) PutExportNameWithBody(ctx context.Context, name string, params 
 	return c.Client.Do(req)
 }
 
-// PutExportName Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+// PutExportName Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3225,7 +5268,7 @@ func (c *Client) GetIdentityProvidersName(ctx context.Context, name string, reqE
 	return c.Client.Do(req)
 }
 
-// PutIdentityProvidersNameWithBody Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+// PutIdentityProvidersNameWithBody Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 //
 // Takes any type of body and a specified content type.
 //
@@ -3242,7 +5285,7 @@ func (c *Client) PutIdentityProvidersNameWithBody(ctx context.Context, name stri
 	return c.Client.Do(req)
 }
 
-// PutIdentityProvidersName Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+// PutIdentityProvidersName Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3466,6 +5509,205 @@ func (c *Client) GetKeysIdUsage(ctx context.Context, id string, reqEditors ...Re
 	return c.Client.Do(req)
 }
 
+// PostLedgerAmendRateHistoryWithBody Append a back-dated correction to the dated rate-card history
+//
+// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+func (c *Client) PostLedgerAmendRateHistoryWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerAmendRateHistoryRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerAmendRateHistory Append a back-dated correction to the dated rate-card history
+//
+// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+func (c *Client) PostLedgerAmendRateHistory(ctx context.Context, body PostLedgerAmendRateHistoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerAmendRateHistoryRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerCheckpoints The sealed checkpoint figures
+//
+// Money is the one ledger's counts x the rate card, recomputed on every read, so no balance checkpoint is sealed and the list is empty. The shape is kept for clients that read it. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Corresponds with GET /api/v1/admin/ledger/checkpoints (the `GetLedgerCheckpoints` operationId).
+func (c *Client) GetLedgerCheckpoints(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerCheckpointsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerMigration The marker the first boot after the upgrade sealed
+//
+// The previous release's rows ARE the one ledger's counts, read as they are, so no migration is sealed: `migrated` is false and `marker` null. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Corresponds with GET /api/v1/admin/ledger/migration (the `GetLedgerMigration` operationId).
+func (c *Client) GetLedgerMigration(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerMigrationRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerOpenapiJson The full administrative OpenAPI 3.1 document, served at the ledger's own path
+//
+// The committed, generated document, unfiltered: every operation this BUILD can serve, including each plane's. `GET /openapi.json` serves the same document filtered to the planes this node configured.
+//
+// Corresponds with GET /api/v1/admin/ledger/openapi.json (the `GetLedgerOpenapiJson` operationId).
+func (c *Client) GetLedgerOpenapiJson(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerOpenapiJsonRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerReconciliation Whether the one ledger prices whole
+//
+// There is one ledger, so there is no second set of figures to be out by: `discrepancies` is always empty, and `holds` is true unless a key's counts the rate card refused to price are named under `refused`. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Corresponds with GET /api/v1/admin/ledger/reconciliation (the `GetLedgerReconciliation` operationId).
+func (c *Client) GetLedgerReconciliation(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerReconciliationRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerRecoveryListWithBody Inspect retained raw ledger operations requiring recovery
+//
+// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+func (c *Client) PostLedgerRecoveryListWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerRecoveryListRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerRecoveryList Inspect retained raw ledger operations requiring recovery
+//
+// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+func (c *Client) PostLedgerRecoveryList(ctx context.Context, body PostLedgerRecoveryListJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerRecoveryListRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerRecoveryResolveWithBody Record an explicit landed or not-landed verdict for an exact retained operation
+//
+// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+func (c *Client) PostLedgerRecoveryResolveWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerRecoveryResolveRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostLedgerRecoveryResolve Record an explicit landed or not-landed verdict for an exact retained operation
+//
+// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+func (c *Client) PostLedgerRecoveryResolve(ctx context.Context, body PostLedgerRecoveryResolveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostLedgerRecoveryResolveRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetLedgerTotals What the one ledger's counts come to, per key
+//
+// Each key's usage counts priced by the one function against the rate card each era was earned under — the figure `GET /keys/{id}/usage` derives. A key whose counts the rate card refused to price is withheld and named under `refused`; every other key with anything counted is served. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Corresponds with GET /api/v1/admin/ledger/totals (the `GetLedgerTotals` operationId).
+func (c *Client) GetLedgerTotals(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetLedgerTotalsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetModels Model lanes + upstream providers
 //
 // Corresponds with GET /api/v1/admin/models (the `GetModels` operationId).
@@ -3496,11 +5738,66 @@ func (c *Client) GetOpenapiJson(ctx context.Context, reqEditors ...RequestEditor
 	return c.Client.Do(req)
 }
 
-// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+// DeleteOverlaySection DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 //
 // Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 func (c *Client) DeleteOverlaySection(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteOverlaySectionRequest(c.Server, section, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetPlaneFacts What a plane this node serves declares about itself
+//
+// The plane's registry key, config sections, grant kinds, nouns, billable classes, fee units, metric families and served operation classes. A read: it mutates nothing and needs `read-only`.
+//
+// Corresponds with GET /api/v1/admin/plane-facts (the `GetPlaneFacts` operationId).
+func (c *Client) GetPlaneFacts(ctx context.Context, params *GetPlaneFactsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPlaneFactsRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostPlaneRecordWriteWithBody Upsert one record of a plane this node serves
+//
+// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+func (c *Client) PostPlaneRecordWriteWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostPlaneRecordWriteRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostPlaneRecordWrite Upsert one record of a plane this node serves
+//
+// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+func (c *Client) PostPlaneRecordWrite(ctx context.Context, body PostPlaneRecordWriteJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostPlaneRecordWriteRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -3767,6 +6064,295 @@ func (c *Client) PostSigningKeyRotate(ctx context.Context, reqEditors ...Request
 	return c.Client.Do(req)
 }
 
+// PostStoreRestoreWithBody Refused: the configured store has no restore operation (disaster recovery)
+//
+// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+func (c *Client) PostStoreRestoreWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostStoreRestoreRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostStoreRestore Refused: the configured store has no restore operation (disaster recovery)
+//
+// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+func (c *Client) PostStoreRestore(ctx context.Context, body PostStoreRestoreJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostStoreRestoreRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTools Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+func (c *Client) GetTools(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteToolsName Remove one `tools:` definition, refused while another config section still references it by bare name
+//
+// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+func (c *Client) DeleteToolsName(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteToolsNameRequest(c.Server, name, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolsName One `tools:` definition
+//
+// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+func (c *Client) GetToolsName(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsNameRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutToolsNameWithBody Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *Client) PutToolsNameWithBody(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutToolsNameRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutToolsName Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *Client) PutToolsName(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutToolsNameRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolsNameChanges The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+func (c *Client) GetToolsNameChanges(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsNameChangesRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostToolsNameConnect Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+//
+// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+func (c *Client) PostToolsNameConnect(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostToolsNameConnectRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetToolsNameHealth Whether one MCP server currently serves, and why not when it does not
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+func (c *Client) GetToolsNameHealth(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetToolsNameHealthRequest(c.Server, name)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchToolsNameSettingsWithBody Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *Client) PatchToolsNameSettingsWithBody(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchToolsNameSettingsRequestWithBody(c.Server, name, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PatchToolsNameSettings Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *Client) PatchToolsNameSettings(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPatchToolsNameSettingsRequest(c.Server, name, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTrust Every trust key of the kernel's trust book and its state
+//
+// The counterparties every plane instance this node serves declares, and the items sighted or approved at each: its key, state, what it is approved at and what it was last sighted at. A read: it mutates nothing and needs `read-only`.
+//
+// Corresponds with GET /api/v1/admin/trust (the `GetTrust` operationId).
+func (c *Client) GetTrust(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTrustRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostTrustApproveWithBody Approve one trust key at what it was last sighted at
+//
+// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+func (c *Client) PostTrustApproveWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostTrustApproveRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostTrustApprove Approve one trust key at what it was last sighted at
+//
+// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+func (c *Client) PostTrustApprove(ctx context.Context, body PostTrustApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostTrustApproveRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostTrustRevokeWithBody Revoke one trust key
+//
+// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+func (c *Client) PostTrustRevokeWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostTrustRevokeRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PostTrustRevoke Revoke one trust key
+//
+// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+func (c *Client) PostTrustRevoke(ctx context.Context, body PostTrustRevokeJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPostTrustRevokeRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // GetUsage Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 //
 // Corresponds with GET /api/v1/admin/usage (the `GetUsage` operationId).
@@ -3780,6 +6366,63 @@ func (c *Client) GetUsage(ctx context.Context, params *GetUsageParams, reqEditor
 		return nil, err
 	}
 	return c.Client.Do(req)
+}
+
+// GetVerify Verify this node's ledger: checkpoints, sequences, the book and the identity
+//
+// Every sealed checkpoint must re-hash to its own body, no node's sequence may go backwards between two checkpoints, the book as it stands is measured against the last checkpoint, and the ledger's postings must reconcile with the previous release's rows. A failed verification is still a 200: `ok` is the answer and `findings` says why. A read: it mutates nothing and needs `read-only`.
+//
+// Corresponds with GET /api/v1/admin/verify (the `GetVerify` operationId).
+func (c *Client) GetVerify(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetVerifyRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewPostAdjustRequest calls the generic PostAdjust builder with application/json body
+func NewPostAdjustRequest(server string, body PostAdjustJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostAdjustRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostAdjustRequestWithBody constructs an http.Request for the PostAdjust method, with any body, and a specified content type
+func NewPostAdjustRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/adjust")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
 }
 
 // NewGetAdminAuthRequest constructs an http.Request for the GetAdminAuth method
@@ -3840,6 +6483,333 @@ func NewPutAdminAuthRequestWithBody(server string, params *PutAdminAuthParams, c
 	}
 
 	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetAgentsRequest constructs an http.Request for the GetAgents method
+func NewGetAgentsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteAgentsNameRequest constructs an http.Request for the DeleteAgentsName method
+func NewDeleteAgentsNameRequest(server string, name string, params *DeleteAgentsNameParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetAgentsNameRequest constructs an http.Request for the GetAgentsName method
+func NewGetAgentsNameRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutAgentsNameRequest calls the generic PutAgentsName builder with application/json body
+func NewPutAgentsNameRequest(server string, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutAgentsNameRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPutAgentsNameRequestWithBody constructs an http.Request for the PutAgentsName method, with any body, and a specified content type
+func NewPutAgentsNameRequestWithBody(server string, name string, params *PutAgentsNameParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewPostAgentsNameApproveRequest calls the generic PostAgentsNameApprove builder with application/json body
+func NewPostAgentsNameApproveRequest(server string, name string, body PostAgentsNameApproveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostAgentsNameApproveRequestWithBody(server, name, "application/json", bodyReader)
+}
+
+// NewPostAgentsNameApproveRequestWithBody constructs an http.Request for the PostAgentsNameApprove method, with any body, and a specified content type
+func NewPostAgentsNameApproveRequestWithBody(server string, name string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s/approve", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostAgentsNameConnectRequest constructs an http.Request for the PostAgentsNameConnect method
+func NewPostAgentsNameConnectRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s/connect", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchAgentsNameSettingsRequest calls the generic PatchAgentsNameSettings builder with application/json body
+func NewPatchAgentsNameSettingsRequest(server string, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchAgentsNameSettingsRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPatchAgentsNameSettingsRequestWithBody constructs an http.Request for the PatchAgentsNameSettings method, with any body, and a specified content type
+func NewPatchAgentsNameSettingsRequestWithBody(server string, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/agents/%s/settings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -3954,6 +6924,118 @@ func NewGetAuditRequest(server string, params *GetAuditParams) (*http.Request, e
 	return req, nil
 }
 
+// NewGetAuditHeadRequest constructs an http.Request for the GetAuditHead method
+func NewGetAuditHeadRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/audit/head")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuditKeysRequest constructs an http.Request for the GetAuditKeys method
+func NewGetAuditKeysRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/audit/keys")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAuditRangeRequest constructs an http.Request for the GetAuditRange method
+func NewGetAuditRangeRequest(server string, params *GetAuditRangeParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/audit/range")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "from", params.From, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "to", params.To, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetAuthRequest constructs an http.Request for the GetAuth method
 func NewGetAuthRequest(server string) (*http.Request, error) {
 	var err error
@@ -4002,6 +7084,73 @@ func NewPostAuthCacheFlushRequestWithBody(server string, contentType string, bod
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/admin/auth/cache/flush")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostChainBreakRequest constructs an http.Request for the PostChainBreak method
+func NewPostChainBreakRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/chain-break")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostCommitUpgradeRequest calls the generic PostCommitUpgrade builder with application/json body
+func NewPostCommitUpgradeRequest(server string, body PostCommitUpgradeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostCommitUpgradeRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostCommitUpgradeRequestWithBody constructs an http.Request for the PostCommitUpgrade method, with any body, and a specified content type
+func NewPostCommitUpgradeRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/commit-upgrade")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -4442,6 +7591,8 @@ func NewGetConfigVersionsVRequest(server string, v int) (*http.Request, error) {
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -4503,6 +7654,8 @@ func NewDeleteExportNameRequest(server string, name string, params *DeleteExport
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -4552,6 +7705,8 @@ func NewGetExportNameRequest(server string, name string) (*http.Request, error) 
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -4596,6 +7751,8 @@ func NewPutExportNameRequestWithBody(server string, name string, params *PutExpo
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -4658,6 +7815,8 @@ func NewPatchExportNameSettingsRequestWithBody(server string, name string, param
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -4792,6 +7951,8 @@ func NewDeleteGroupsNameRequest(server string, name string, params *DeleteGroups
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -4841,6 +8002,8 @@ func NewGetGroupsNameRequest(server string, name string) (*http.Request, error) 
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -4885,6 +8048,8 @@ func NewPatchGroupsNameRequestWithBody(server string, name string, params *Patch
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -4948,6 +8113,8 @@ func NewPutGroupsNameRequestWithBody(server string, name string, params *PutGrou
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -4998,6 +8165,8 @@ func NewGetGroupsNameUsageRequest(server string, name string) (*http.Request, er
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5115,6 +8284,8 @@ func NewDeleteHooksNameRequest(server string, name string, params *DeleteHooksNa
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5164,6 +8335,8 @@ func NewGetHooksNameRequest(server string, name string) (*http.Request, error) {
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5208,6 +8381,8 @@ func NewPutHooksNameRequestWithBody(server string, name string, params *PutHooks
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5260,6 +8435,8 @@ func NewGetHooksNameHealthRequest(server string, name string) (*http.Request, er
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5293,6 +8470,8 @@ func NewGetHooksNameSchemaRequest(server string, name string) (*http.Request, er
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5338,6 +8517,8 @@ func NewPatchHooksNameSettingsRequestWithBody(server string, name string, params
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5389,6 +8570,8 @@ func NewGetHooksNameStatusRequest(server string, name string) (*http.Request, er
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5451,6 +8634,8 @@ func NewDeleteIdentityProvidersNameRequest(server string, name string, params *D
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5500,6 +8685,8 @@ func NewGetIdentityProvidersNameRequest(server string, name string) (*http.Reque
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5544,6 +8731,8 @@ func NewPutIdentityProvidersNameRequestWithBody(server string, name string, para
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5606,6 +8795,8 @@ func NewPatchIdentityProvidersNameSettingsRequestWithBody(server string, name st
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5839,6 +9030,8 @@ func NewDeleteKeysIdRequest(server string, id string, params *DeleteKeysIdParams
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5888,6 +9081,8 @@ func NewGetKeysIdRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -5932,6 +9127,8 @@ func NewPatchKeysIdRequestWithBody(server string, id string, params *PatchKeysId
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -5984,6 +9181,8 @@ func NewPostKeysIdRevokeRequest(server string, id string) (*http.Request, error)
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -6017,6 +9216,8 @@ func NewPostKeysIdRotateRequest(server string, id string) (*http.Request, error)
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -6052,12 +9253,269 @@ func NewGetKeysIdUsageRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/admin/keys/%s/usage", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostLedgerAmendRateHistoryRequest calls the generic PostLedgerAmendRateHistory builder with application/json body
+func NewPostLedgerAmendRateHistoryRequest(server string, body PostLedgerAmendRateHistoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostLedgerAmendRateHistoryRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostLedgerAmendRateHistoryRequestWithBody constructs an http.Request for the PostLedgerAmendRateHistory method, with any body, and a specified content type
+func NewPostLedgerAmendRateHistoryRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/amend-rate-history")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetLedgerCheckpointsRequest constructs an http.Request for the GetLedgerCheckpoints method
+func NewGetLedgerCheckpointsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/checkpoints")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLedgerMigrationRequest constructs an http.Request for the GetLedgerMigration method
+func NewGetLedgerMigrationRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/migration")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLedgerOpenapiJsonRequest constructs an http.Request for the GetLedgerOpenapiJson method
+func NewGetLedgerOpenapiJsonRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/openapi.json")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetLedgerReconciliationRequest constructs an http.Request for the GetLedgerReconciliation method
+func NewGetLedgerReconciliationRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/reconciliation")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostLedgerRecoveryListRequest calls the generic PostLedgerRecoveryList builder with application/json body
+func NewPostLedgerRecoveryListRequest(server string, body PostLedgerRecoveryListJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostLedgerRecoveryListRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostLedgerRecoveryListRequestWithBody constructs an http.Request for the PostLedgerRecoveryList method, with any body, and a specified content type
+func NewPostLedgerRecoveryListRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/recovery/list")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostLedgerRecoveryResolveRequest calls the generic PostLedgerRecoveryResolve builder with application/json body
+func NewPostLedgerRecoveryResolveRequest(server string, body PostLedgerRecoveryResolveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostLedgerRecoveryResolveRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostLedgerRecoveryResolveRequestWithBody constructs an http.Request for the PostLedgerRecoveryResolve method, with any body, and a specified content type
+func NewPostLedgerRecoveryResolveRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/recovery/resolve")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetLedgerTotalsRequest constructs an http.Request for the GetLedgerTotals method
+func NewGetLedgerTotalsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/ledger/totals")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -6140,6 +9598,8 @@ func NewDeleteOverlaySectionRequest(server string, section DeleteOverlaySectionP
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -6174,6 +9634,96 @@ func NewDeleteOverlaySectionRequest(server string, section DeleteOverlaySectionP
 		}
 
 	}
+
+	return req, nil
+}
+
+// NewGetPlaneFactsRequest constructs an http.Request for the GetPlaneFacts method
+func NewGetPlaneFactsRequest(server string, params *GetPlaneFactsParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/plane-facts")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "plane", params.Plane, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostPlaneRecordWriteRequest calls the generic PostPlaneRecordWrite builder with application/json body
+func NewPostPlaneRecordWriteRequest(server string, body PostPlaneRecordWriteJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostPlaneRecordWriteRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostPlaneRecordWriteRequestWithBody constructs an http.Request for the PostPlaneRecordWrite method, with any body, and a specified content type
+func NewPostPlaneRecordWriteRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/plane-record-write")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -6401,6 +9951,8 @@ func NewDeletePluginsFileRequest(server string, file string) (*http.Request, err
 		return nil, err
 	}
 
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
 	serverURL, err := url.Parse(server)
 	if err != nil {
 		return nil, err
@@ -6434,6 +9986,8 @@ func NewGetPluginsFileSchemaRequest(server string, file string) (*http.Request, 
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -6522,6 +10076,8 @@ func NewGetPoolsNameRequest(server string, name string) (*http.Request, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
 
 	serverURL, err := url.Parse(server)
 	if err != nil {
@@ -6640,6 +10196,503 @@ func NewPostSigningKeyRotateRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewPostStoreRestoreRequest calls the generic PostStoreRestore builder with application/json body
+func NewPostStoreRestoreRequest(server string, body PostStoreRestoreJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostStoreRestoreRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostStoreRestoreRequestWithBody constructs an http.Request for the PostStoreRestore method, with any body, and a specified content type
+func NewPostStoreRestoreRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/store-restore")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetToolsRequest constructs an http.Request for the GetTools method
+func NewGetToolsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteToolsNameRequest constructs an http.Request for the DeleteToolsName method
+func NewDeleteToolsNameRequest(server string, name string, params *DeleteToolsNameParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetToolsNameRequest constructs an http.Request for the GetToolsName method
+func NewGetToolsNameRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutToolsNameRequest calls the generic PutToolsName builder with application/json body
+func NewPutToolsNameRequest(server string, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutToolsNameRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPutToolsNameRequestWithBody constructs an http.Request for the PutToolsName method, with any body, and a specified content type
+func NewPutToolsNameRequestWithBody(server string, name string, params *PutToolsNameParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetToolsNameChangesRequest constructs an http.Request for the GetToolsNameChanges method
+func NewGetToolsNameChangesRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/changes", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostToolsNameConnectRequest constructs an http.Request for the PostToolsNameConnect method
+func NewPostToolsNameConnectRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/connect", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetToolsNameHealthRequest constructs an http.Request for the GetToolsNameHealth method
+func NewGetToolsNameHealthRequest(server string, name string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/health", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPatchToolsNameSettingsRequest calls the generic PatchToolsNameSettings builder with application/json body
+func NewPatchToolsNameSettingsRequest(server string, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPatchToolsNameSettingsRequestWithBody(server, name, params, "application/json", bodyReader)
+}
+
+// NewPatchToolsNameSettingsRequestWithBody constructs an http.Request for the PatchToolsNameSettings method, with any body, and a specified content type
+func NewPatchToolsNameSettingsRequestWithBody(server string, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "name", name, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	pathParam0 = escapeDotPathParameter(pathParam0)
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/tools/%s/settings", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		if params.IfMatch != nil {
+			var headerParam0 string
+
+			headerParam0, err = runtime.StyleParamWithOptions("simple", false, "If-Match", *params.IfMatch, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+			if err != nil {
+				return nil, err
+			}
+
+			req.Header.Set("If-Match", headerParam0)
+		}
+
+	}
+
+	return req, nil
+}
+
+// NewGetTrustRequest constructs an http.Request for the GetTrust method
+func NewGetTrustRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/trust")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPostTrustApproveRequest calls the generic PostTrustApprove builder with application/json body
+func NewPostTrustApproveRequest(server string, body PostTrustApproveJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostTrustApproveRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostTrustApproveRequestWithBody constructs an http.Request for the PostTrustApprove method, with any body, and a specified content type
+func NewPostTrustApproveRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/trust/approve")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewPostTrustRevokeRequest calls the generic PostTrustRevoke builder with application/json body
+func NewPostTrustRevokeRequest(server string, body PostTrustRevokeJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPostTrustRevokeRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPostTrustRevokeRequestWithBody constructs an http.Request for the PostTrustRevoke method, with any body, and a specified content type
+func NewPostTrustRevokeRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/trust/revoke")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetUsageRequest constructs an http.Request for the GetUsage method
 func NewGetUsageRequest(server string, params *GetUsageParams) (*http.Request, error) {
 	var err error
@@ -6680,10 +10733,49 @@ func NewGetUsageRequest(server string, params *GetUsageParams) (*http.Request, e
 
 		}
 
+		if params.AsOf != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "as_of", *params.AsOf, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
 		if encoded := queryValues.Encode(); encoded != "" {
 			rawQueryFragments = append(rawQueryFragments, encoded)
 		}
 		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetVerifyRequest constructs an http.Request for the GetVerify method
+func NewGetVerifyRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/admin/verify")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
@@ -6738,6 +10830,24 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
+	// PostAdjustWithBodyWithResponse Correct a key's COUNTS by a signed delta, never a money figure
+	//
+	// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+	PostAdjustWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAdjustResponse, error)
+
+	// PostAdjustWithResponse Correct a key's COUNTS by a signed delta, never a money figure
+	//
+	// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+	PostAdjustWithResponse(ctx context.Context, body PostAdjustJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAdjustResponse, error)
+
 	// GetAdminAuthWithResponse Admin-plane auth config (the admin surface guard)
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -6759,12 +10869,109 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /api/v1/admin/admin-auth (the `PutAdminAuth` operationId).
 	PutAdminAuthWithResponse(ctx context.Context, params *PutAdminAuthParams, body PutAdminAuthJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAdminAuthResponse, error)
 
+	// GetAgentsWithResponse Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+	GetAgentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentsResponse, error)
+
+	// DeleteAgentsNameWithResponse Remove one `agents:` definition, refused while another config section still references it by bare name
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+	DeleteAgentsNameWithResponse(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*DeleteAgentsNameResponse, error)
+
+	// GetAgentsNameWithResponse One `agents:` definition
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+	GetAgentsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetAgentsNameResponse, error)
+
+	// PutAgentsNameWithBodyWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsNameWithBodyWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error)
+
+	// PutAgentsNameWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+	PutAgentsNameWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error)
+
+	// PostAgentsNameApproveWithBodyWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApproveWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error)
+
+	// PostAgentsNameApproveWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+	PostAgentsNameApproveWithResponse(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error)
+
+	// PostAgentsNameConnectWithResponse Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing; the card it verified is recorded as the agent's card records, which an instance opened again serves from
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+	PostAgentsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostAgentsNameConnectResponse, error)
+
+	// PatchAgentsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error)
+
+	// PatchAgentsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+	PatchAgentsNameSettingsWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error)
+
 	// GetAuditWithResponse Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/admin/audit (the `GetAudit` operationId).
 	GetAuditWithResponse(ctx context.Context, params *GetAuditParams, reqEditors ...RequestEditorFn) (*GetAuditResponse, error)
+
+	// GetAuditHeadWithResponse The audit record chain's tip: position, digest, signature, key identifier and clock
+	//
+	// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/audit/head (the `GetAuditHead` operationId).
+	GetAuditHeadWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditHeadResponse, error)
+
+	// GetAuditKeysWithResponse The public keys the audit chain is signed with
+	//
+	// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/audit/keys (the `GetAuditKeys` operationId).
+	GetAuditKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditKeysResponse, error)
+
+	// GetAuditRangeWithResponse Audit records by position, each with every field its digest was taken over
+	//
+	// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/audit/range (the `GetAuditRange` operationId).
+	GetAuditRangeWithResponse(ctx context.Context, params *GetAuditRangeParams, reqEditors ...RequestEditorFn) (*GetAuditRangeResponse, error)
 
 	// GetAuthWithResponse Ingress auth chain + upstream-credential mode
 	//
@@ -6786,6 +10993,33 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /api/v1/admin/auth/cache/flush (the `PostAuthCacheFlush` operationId).
 	PostAuthCacheFlushWithResponse(ctx context.Context, body PostAuthCacheFlushJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAuthCacheFlushResponse, error)
+
+	// PostChainBreakWithResponse Deliberately break the journal chain (disaster recovery)
+	//
+	// Admitted through the same gates as every other new verb, then handed to the store. The request body is not read.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/chain-break (the `PostChainBreak` operationId).
+	PostChainBreakWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostChainBreakResponse, error)
+
+	// PostCommitUpgradeWithBodyWithResponse Commit the fleet to the release this node runs
+	//
+	// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+	PostCommitUpgradeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCommitUpgradeResponse, error)
+
+	// PostCommitUpgradeWithResponse Commit the fleet to the release this node runs
+	//
+	// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+	PostCommitUpgradeWithResponse(ctx context.Context, body PostCommitUpgradeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCommitUpgradeResponse, error)
 
 	// GetConfigWithResponse Effective running config snapshot (redacted)
 	//
@@ -6906,14 +11140,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/export/{name} (the `GetExportName` operationId).
 	GetExportNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetExportNameResponse, error)
 
-	// PutExportNameWithBodyWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	// PutExportNameWithBodyWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/admin/export/{name} (the `PutExportName` operationId).
 	PutExportNameWithBodyWithResponse(ctx context.Context, name string, params *PutExportNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutExportNameResponse, error)
 
-	// PutExportNameWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+	// PutExportNameWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7109,14 +11343,14 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/identity-providers/{name} (the `GetIdentityProvidersName` operationId).
 	GetIdentityProvidersNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetIdentityProvidersNameResponse, error)
 
-	// PutIdentityProvidersNameWithBodyWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	// PutIdentityProvidersNameWithBodyWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /api/v1/admin/identity-providers/{name} (the `PutIdentityProvidersName` operationId).
 	PutIdentityProvidersNameWithBodyWithResponse(ctx context.Context, name string, params *PutIdentityProvidersNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutIdentityProvidersNameResponse, error)
 
-	// PutIdentityProvidersNameWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+	// PutIdentityProvidersNameWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -7214,6 +11448,105 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/keys/{id}/usage (the `GetKeysIdUsage` operationId).
 	GetKeysIdUsageWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetKeysIdUsageResponse, error)
 
+	// PostLedgerAmendRateHistoryWithBodyWithResponse Append a back-dated correction to the dated rate-card history
+	//
+	// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+	PostLedgerAmendRateHistoryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerAmendRateHistoryResponse, error)
+
+	// PostLedgerAmendRateHistoryWithResponse Append a back-dated correction to the dated rate-card history
+	//
+	// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+	PostLedgerAmendRateHistoryWithResponse(ctx context.Context, body PostLedgerAmendRateHistoryJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerAmendRateHistoryResponse, error)
+
+	// GetLedgerCheckpointsWithResponse The sealed checkpoint figures
+	//
+	// Money is the one ledger's counts x the rate card, recomputed on every read, so no balance checkpoint is sealed and the list is empty. The shape is kept for clients that read it. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/ledger/checkpoints (the `GetLedgerCheckpoints` operationId).
+	GetLedgerCheckpointsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerCheckpointsResponse, error)
+
+	// GetLedgerMigrationWithResponse The marker the first boot after the upgrade sealed
+	//
+	// The previous release's rows ARE the one ledger's counts, read as they are, so no migration is sealed: `migrated` is false and `marker` null. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/ledger/migration (the `GetLedgerMigration` operationId).
+	GetLedgerMigrationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerMigrationResponse, error)
+
+	// GetLedgerOpenapiJsonWithResponse The full administrative OpenAPI 3.1 document, served at the ledger's own path
+	//
+	// The committed, generated document, unfiltered: every operation this BUILD can serve, including each plane's. `GET /openapi.json` serves the same document filtered to the planes this node configured.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/ledger/openapi.json (the `GetLedgerOpenapiJson` operationId).
+	GetLedgerOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerOpenapiJsonResponse, error)
+
+	// GetLedgerReconciliationWithResponse Whether the one ledger prices whole
+	//
+	// There is one ledger, so there is no second set of figures to be out by: `discrepancies` is always empty, and `holds` is true unless a key's counts the rate card refused to price are named under `refused`. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/ledger/reconciliation (the `GetLedgerReconciliation` operationId).
+	GetLedgerReconciliationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerReconciliationResponse, error)
+
+	// PostLedgerRecoveryListWithBodyWithResponse Inspect retained raw ledger operations requiring recovery
+	//
+	// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+	PostLedgerRecoveryListWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryListResponse, error)
+
+	// PostLedgerRecoveryListWithResponse Inspect retained raw ledger operations requiring recovery
+	//
+	// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+	PostLedgerRecoveryListWithResponse(ctx context.Context, body PostLedgerRecoveryListJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryListResponse, error)
+
+	// PostLedgerRecoveryResolveWithBodyWithResponse Record an explicit landed or not-landed verdict for an exact retained operation
+	//
+	// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+	PostLedgerRecoveryResolveWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryResolveResponse, error)
+
+	// PostLedgerRecoveryResolveWithResponse Record an explicit landed or not-landed verdict for an exact retained operation
+	//
+	// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+	PostLedgerRecoveryResolveWithResponse(ctx context.Context, body PostLedgerRecoveryResolveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryResolveResponse, error)
+
+	// GetLedgerTotalsWithResponse What the one ledger's counts come to, per key
+	//
+	// Each key's usage counts priced by the one function against the rate card each era was earned under — the figure `GET /keys/{id}/usage` derives. A key whose counts the rate card refused to price is withheld and named under `refused`; every other key with anything counted is served. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/ledger/totals (the `GetLedgerTotals` operationId).
+	GetLedgerTotalsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerTotalsResponse, error)
+
 	// GetModelsWithResponse Model lanes + upstream providers
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -7228,12 +11561,39 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /api/v1/admin/openapi.json (the `GetOpenapiJson` operationId).
 	GetOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetOpenapiJsonResponse, error)
 
-	// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+	// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /api/v1/admin/overlay/{section} (the `DeleteOverlaySection` operationId).
 	DeleteOverlaySectionWithResponse(ctx context.Context, section DeleteOverlaySectionParamsSection, params *DeleteOverlaySectionParams, reqEditors ...RequestEditorFn) (*DeleteOverlaySectionResponse, error)
+
+	// GetPlaneFactsWithResponse What a plane this node serves declares about itself
+	//
+	// The plane's registry key, config sections, grant kinds, nouns, billable classes, fee units, metric families and served operation classes. A read: it mutates nothing and needs `read-only`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/plane-facts (the `GetPlaneFacts` operationId).
+	GetPlaneFactsWithResponse(ctx context.Context, params *GetPlaneFactsParams, reqEditors ...RequestEditorFn) (*GetPlaneFactsResponse, error)
+
+	// PostPlaneRecordWriteWithBodyWithResponse Upsert one record of a plane this node serves
+	//
+	// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+	PostPlaneRecordWriteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostPlaneRecordWriteResponse, error)
+
+	// PostPlaneRecordWriteWithResponse Upsert one record of a plane this node serves
+	//
+	// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+	PostPlaneRecordWriteWithResponse(ctx context.Context, body PostPlaneRecordWriteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostPlaneRecordWriteResponse, error)
 
 	// GetPluginsWithResponse Plugin catalog by type (compiled-in + external + dynamic-library)
 	//
@@ -7347,12 +11707,230 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /api/v1/admin/signing-key/rotate (the `PostSigningKeyRotate` operationId).
 	PostSigningKeyRotateWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostSigningKeyRotateResponse, error)
 
+	// PostStoreRestoreWithBodyWithResponse Refused: the configured store has no restore operation (disaster recovery)
+	//
+	// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+	PostStoreRestoreWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostStoreRestoreResponse, error)
+
+	// PostStoreRestoreWithResponse Refused: the configured store has no restore operation (disaster recovery)
+	//
+	// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+	PostStoreRestoreWithResponse(ctx context.Context, body PostStoreRestoreJSONRequestBody, reqEditors ...RequestEditorFn) (*PostStoreRestoreResponse, error)
+
+	// GetToolsWithResponse Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+	GetToolsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetToolsResponse, error)
+
+	// DeleteToolsNameWithResponse Remove one `tools:` definition, refused while another config section still references it by bare name
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+	DeleteToolsNameWithResponse(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*DeleteToolsNameResponse, error)
+
+	// GetToolsNameWithResponse One `tools:` definition
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+	GetToolsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameResponse, error)
+
+	// PutToolsNameWithBodyWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsNameWithBodyWithResponse(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error)
+
+	// PutToolsNameWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+	PutToolsNameWithResponse(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error)
+
+	// GetToolsNameChangesWithResponse The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+	GetToolsNameChangesWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameChangesResponse, error)
+
+	// PostToolsNameConnectWithResponse Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+	PostToolsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostToolsNameConnectResponse, error)
+
+	// GetToolsNameHealthWithResponse Whether one MCP server currently serves, and why not when it does not
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+	GetToolsNameHealthWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameHealthResponse, error)
+
+	// PatchToolsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error)
+
+	// PatchToolsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+	PatchToolsNameSettingsWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error)
+
+	// GetTrustWithResponse Every trust key of the kernel's trust book and its state
+	//
+	// The counterparties every plane instance this node serves declares, and the items sighted or approved at each: its key, state, what it is approved at and what it was last sighted at. A read: it mutates nothing and needs `read-only`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/trust (the `GetTrust` operationId).
+	GetTrustWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTrustResponse, error)
+
+	// PostTrustApproveWithBodyWithResponse Approve one trust key at what it was last sighted at
+	//
+	// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+	PostTrustApproveWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTrustApproveResponse, error)
+
+	// PostTrustApproveWithResponse Approve one trust key at what it was last sighted at
+	//
+	// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+	PostTrustApproveWithResponse(ctx context.Context, body PostTrustApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTrustApproveResponse, error)
+
+	// PostTrustRevokeWithBodyWithResponse Revoke one trust key
+	//
+	// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+	PostTrustRevokeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTrustRevokeResponse, error)
+
+	// PostTrustRevokeWithResponse Revoke one trust key
+	//
+	// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+	PostTrustRevokeWithResponse(ctx context.Context, body PostTrustRevokeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTrustRevokeResponse, error)
+
 	// GetUsageWithResponse Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /api/v1/admin/usage (the `GetUsage` operationId).
 	GetUsageWithResponse(ctx context.Context, params *GetUsageParams, reqEditors ...RequestEditorFn) (*GetUsageResponse, error)
+
+	// GetVerifyWithResponse Verify this node's ledger: checkpoints, sequences, the book and the identity
+	//
+	// Every sealed checkpoint must re-hash to its own body, no node's sequence may go backwards between two checkpoints, the book as it stands is measured against the last checkpoint, and the ledger's postings must reconcile with the previous release's rows. A failed verification is still a 200: `ok` is the answer and `findings` says why. A read: it mutates nothing and needs `read-only`.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /api/v1/admin/verify (the `GetVerify` operationId).
+	GetVerifyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVerifyResponse, error)
+}
+
+type PostAdjustResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AdjustView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostAdjustResponse) GetJSON200() *AdjustView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostAdjustResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostAdjustResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostAdjustResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostAdjustResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostAdjustResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostAdjustResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostAdjustResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostAdjustResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostAdjustResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
 }
 
 type GetAdminAuthResponse struct {
@@ -7366,6 +11944,8 @@ type GetAdminAuthResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7386,6 +11966,11 @@ func (r GetAdminAuthResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetAdminAuthResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetAdminAuthResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -7434,6 +12019,8 @@ type PutAdminAuthResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7471,6 +12058,11 @@ func (r PutAdminAuthResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutAdminAuthResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PutAdminAuthResponse) GetBody() []byte {
 	return r.Body
@@ -7500,6 +12092,552 @@ func (r PutAdminAuthResponse) ContentType() string {
 	return ""
 }
 
+type GetAgentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageNamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentsResponse) GetJSON200() *PageNamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAgentsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetAgentsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetAgentsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteAgentsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteAgentsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteAgentsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteAgentsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteAgentsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAgentsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAgentsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAgentsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetAgentsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetAgentsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetAgentsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAgentsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutAgentsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutAgentsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutAgentsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PutAgentsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PutAgentsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PutAgentsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutAgentsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PutAgentsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutAgentsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutAgentsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutAgentsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutAgentsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostAgentsNameApproveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *A2aTrustView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON200() *A2aTrustView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostAgentsNameApproveResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostAgentsNameApproveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostAgentsNameApproveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostAgentsNameApproveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostAgentsNameApproveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostAgentsNameConnectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *A2aTrustView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON200() *A2aTrustView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostAgentsNameConnectResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostAgentsNameConnectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostAgentsNameConnectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostAgentsNameConnectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostAgentsNameConnectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchAgentsNameSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PatchAgentsNameSettingsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchAgentsNameSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchAgentsNameSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchAgentsNameSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchAgentsNameSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetAuditResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7513,6 +12651,8 @@ type GetAuditResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7538,6 +12678,11 @@ func (r GetAuditResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetAuditResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetAuditResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -7569,6 +12714,199 @@ func (r GetAuditResponse) ContentType() string {
 	return ""
 }
 
+type GetAuditHeadResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuditChainHeadView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditHeadResponse) GetJSON200() *AuditChainHeadView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAuditHeadResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetAuditHeadResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetAuditHeadResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditHeadResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditHeadResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditHeadResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditHeadResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAuditKeysResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuditChainKeysView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditKeysResponse) GetJSON200() *AuditChainKeysView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAuditKeysResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetAuditKeysResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetAuditKeysResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditKeysResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditKeysResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditKeysResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditKeysResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetAuditRangeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AuditChainRangeView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetAuditRangeResponse) GetJSON200() *AuditChainRangeView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetAuditRangeResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetAuditRangeResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetAuditRangeResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetAuditRangeResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetAuditRangeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAuditRangeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAuditRangeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetAuditRangeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetAuthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7580,6 +12918,8 @@ type GetAuthResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7600,6 +12940,11 @@ func (r GetAuthResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetAuthResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetAuthResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -7646,6 +12991,8 @@ type PostAuthCacheFlushResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7678,6 +13025,11 @@ func (r PostAuthCacheFlushResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostAuthCacheFlushResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PostAuthCacheFlushResponse) GetBody() []byte {
 	return r.Body
@@ -7707,6 +13059,144 @@ func (r PostAuthCacheFlushResponse) ContentType() string {
 	return ""
 }
 
+type PostChainBreakResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostChainBreakResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostChainBreakResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostChainBreakResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostChainBreakResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostChainBreakResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostChainBreakResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostChainBreakResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostChainBreakResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostCommitUpgradeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CommitUpgradeView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostCommitUpgradeResponse) GetJSON200() *CommitUpgradeView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostCommitUpgradeResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostCommitUpgradeResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostCommitUpgradeResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PostCommitUpgradeResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostCommitUpgradeResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostCommitUpgradeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostCommitUpgradeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostCommitUpgradeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostCommitUpgradeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetConfigResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -7718,6 +13208,8 @@ type GetConfigResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7738,6 +13230,11 @@ func (r GetConfigResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetConfigResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetConfigResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -7786,6 +13283,8 @@ type PostConfigApplyResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7821,6 +13320,11 @@ func (r PostConfigApplyResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostConfigApplyResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostConfigApplyResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -7867,6 +13371,8 @@ type GetConfigDiffResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7897,6 +13403,11 @@ func (r GetConfigDiffResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetConfigDiffResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetConfigDiffResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -7943,6 +13454,8 @@ type PostConfigReloadResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -7973,6 +13486,11 @@ func (r PostConfigReloadResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostConfigReloadResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostConfigReloadResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8023,6 +13541,8 @@ type PostConfigRollbackResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8065,6 +13585,11 @@ func (r PostConfigRollbackResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostConfigRollbackResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PostConfigRollbackResponse) GetBody() []byte {
 	return r.Body
@@ -8105,6 +13630,8 @@ type GetConfigSettingsResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8125,6 +13652,11 @@ func (r GetConfigSettingsResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetConfigSettingsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetConfigSettingsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8173,6 +13705,8 @@ type PutConfigSettingsResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8208,6 +13742,11 @@ func (r PutConfigSettingsResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PutConfigSettingsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutConfigSettingsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8254,6 +13793,8 @@ type PostConfigValidateResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8284,6 +13825,11 @@ func (r PostConfigValidateResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostConfigValidateResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostConfigValidateResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8328,6 +13874,8 @@ type GetConfigVersionsResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8353,6 +13901,11 @@ func (r GetConfigVersionsResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetConfigVersionsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetConfigVersionsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8399,6 +13952,8 @@ type GetConfigVersionsVResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8429,6 +13984,11 @@ func (r GetConfigVersionsVResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetConfigVersionsVResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetConfigVersionsVResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8471,6 +14031,8 @@ type GetExportResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8491,6 +14053,11 @@ func (r GetExportResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetExportResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetExportResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8525,6 +14092,8 @@ func (r GetExportResponse) ContentType() string {
 type DeleteExportNameResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PendingRestartRemovalView
 	// JSON400 the response for an HTTP 400 `application/json` response
 	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
@@ -8539,6 +14108,13 @@ type DeleteExportNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r DeleteExportNameResponse) GetJSON200() *PendingRestartRemovalView {
+	return r.JSON200
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -8574,6 +14150,11 @@ func (r DeleteExportNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r DeleteExportNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteExportNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8618,6 +14199,8 @@ type GetExportNameResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8643,6 +14226,11 @@ func (r GetExportNameResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetExportNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetExportNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8691,6 +14279,8 @@ type PutExportNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8726,6 +14316,11 @@ func (r PutExportNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PutExportNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutExportNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8776,6 +14371,8 @@ type PatchExportNameSettingsResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8818,6 +14415,11 @@ func (r PatchExportNameSettingsResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PatchExportNameSettingsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PatchExportNameSettingsResponse) GetBody() []byte {
 	return r.Body
@@ -8858,6 +14460,8 @@ type GetGroupsResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8878,6 +14482,11 @@ func (r GetGroupsResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetGroupsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetGroupsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -8928,6 +14537,8 @@ type PostGroupsResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -8968,6 +14579,11 @@ func (r PostGroupsResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostGroupsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostGroupsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9016,6 +14632,8 @@ type DeleteGroupsNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -9051,6 +14669,11 @@ func (r DeleteGroupsNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r DeleteGroupsNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteGroupsNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9095,6 +14718,8 @@ type GetGroupsNameResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9120,6 +14745,11 @@ func (r GetGroupsNameResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetGroupsNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetGroupsNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9170,6 +14800,8 @@ type PatchGroupsNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9210,6 +14842,11 @@ func (r PatchGroupsNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PatchGroupsNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PatchGroupsNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9260,6 +14897,8 @@ type PutGroupsNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9302,6 +14941,11 @@ func (r PutGroupsNameResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutGroupsNameResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PutGroupsNameResponse) GetBody() []byte {
 	return r.Body
@@ -9342,8 +14986,12 @@ type GetGroupsNameUsageResponse struct {
 	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9366,9 +15014,19 @@ func (r GetGroupsNameUsageResponse) GetJSON404() *Error {
 	return r.JSON404
 }
 
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r GetGroupsNameUsageResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetGroupsNameUsageResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetGroupsNameUsageResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9411,6 +15069,8 @@ type GetHooksResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9431,6 +15091,11 @@ func (r GetHooksResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetHooksResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetHooksResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9481,6 +15146,8 @@ type PostHooksResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9521,6 +15188,11 @@ func (r PostHooksResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostHooksResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostHooksResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9569,6 +15241,8 @@ type DeleteHooksNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -9604,6 +15278,11 @@ func (r DeleteHooksNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r DeleteHooksNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteHooksNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9648,6 +15327,8 @@ type GetHooksNameResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9673,6 +15354,11 @@ func (r GetHooksNameResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetHooksNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetHooksNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9723,6 +15409,8 @@ type PutHooksNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9763,6 +15451,11 @@ func (r PutHooksNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PutHooksNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutHooksNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9807,6 +15500,8 @@ type GetHooksNameHealthResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9832,6 +15527,11 @@ func (r GetHooksNameHealthResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetHooksNameHealthResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetHooksNameHealthResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9876,6 +15576,8 @@ type GetHooksNameSchemaResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9901,6 +15603,11 @@ func (r GetHooksNameSchemaResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetHooksNameSchemaResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetHooksNameSchemaResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -9951,6 +15658,8 @@ type PatchHooksNameSettingsResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -9991,6 +15700,11 @@ func (r PatchHooksNameSettingsResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PatchHooksNameSettingsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PatchHooksNameSettingsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10035,6 +15749,8 @@ type GetHooksNameStatusResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10060,6 +15776,11 @@ func (r GetHooksNameStatusResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetHooksNameStatusResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetHooksNameStatusResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10102,6 +15823,8 @@ type GetIdentityProvidersResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10122,6 +15845,11 @@ func (r GetIdentityProvidersResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetIdentityProvidersResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetIdentityProvidersResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10170,6 +15898,8 @@ type DeleteIdentityProvidersNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -10205,6 +15935,11 @@ func (r DeleteIdentityProvidersNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r DeleteIdentityProvidersNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteIdentityProvidersNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10249,6 +15984,8 @@ type GetIdentityProvidersNameResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10274,6 +16011,11 @@ func (r GetIdentityProvidersNameResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetIdentityProvidersNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetIdentityProvidersNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10322,6 +16064,8 @@ type PutIdentityProvidersNameResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10357,6 +16101,11 @@ func (r PutIdentityProvidersNameResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PutIdentityProvidersNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PutIdentityProvidersNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10407,6 +16156,8 @@ type PatchIdentityProvidersNameSettingsResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10449,6 +16200,11 @@ func (r PatchIdentityProvidersNameSettingsResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PatchIdentityProvidersNameSettingsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PatchIdentityProvidersNameSettingsResponse) GetBody() []byte {
 	return r.Body
@@ -10489,6 +16245,8 @@ type GetInfoResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10509,6 +16267,11 @@ func (r GetInfoResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetInfoResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetInfoResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10553,6 +16316,8 @@ type GetKeysResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10578,6 +16343,11 @@ func (r GetKeysResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetKeysResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetKeysResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10626,6 +16396,8 @@ type PostKeysResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -10661,6 +16433,11 @@ func (r PostKeysResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostKeysResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostKeysResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10709,6 +16486,8 @@ type DeleteKeysIdResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -10744,6 +16523,11 @@ func (r DeleteKeysIdResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r DeleteKeysIdResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteKeysIdResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10790,6 +16574,8 @@ type GetKeysIdResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10820,6 +16606,11 @@ func (r GetKeysIdResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetKeysIdResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetKeysIdResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10870,6 +16661,8 @@ type PatchKeysIdResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -10910,6 +16703,11 @@ func (r PatchKeysIdResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PatchKeysIdResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PatchKeysIdResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -10960,6 +16758,8 @@ type PostKeysIdRevokeResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11002,6 +16802,11 @@ func (r PostKeysIdRevokeResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostKeysIdRevokeResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PostKeysIdRevokeResponse) GetBody() []byte {
 	return r.Body
@@ -11036,6 +16841,8 @@ type PostKeysIdRotateResponse struct {
 	HTTPResponse *http.Response
 	// JSON200 the response for an HTTP 200 `application/json` response
 	JSON200 *RotatedKeyView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
 	// JSON401 the response for an HTTP 401 `application/json` response
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
@@ -11048,11 +16855,18 @@ type PostKeysIdRotateResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
 func (r PostKeysIdRotateResponse) GetJSON200() *RotatedKeyView {
 	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostKeysIdRotateResponse) GetJSON400() *Error {
+	return r.JSON400
 }
 
 // GetJSON401 returns the response for an HTTP 401 `application/json` response
@@ -11083,6 +16897,11 @@ func (r PostKeysIdRotateResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostKeysIdRotateResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostKeysIdRotateResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11127,8 +16946,12 @@ type GetKeysIdUsageResponse struct {
 	JSON403 *Error
 	// JSON404 the response for an HTTP 404 `application/json` response
 	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11156,9 +16979,19 @@ func (r GetKeysIdUsageResponse) GetJSON404() *Error {
 	return r.JSON404
 }
 
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r GetKeysIdUsageResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetKeysIdUsageResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetKeysIdUsageResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11190,6 +17023,502 @@ func (r GetKeysIdUsageResponse) ContentType() string {
 	return ""
 }
 
+type PostLedgerAmendRateHistoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *AmendRateHistoryView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostLedgerAmendRateHistoryResponse) GetJSON200() *AmendRateHistoryView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostLedgerAmendRateHistoryResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostLedgerAmendRateHistoryResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostLedgerAmendRateHistoryResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostLedgerAmendRateHistoryResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostLedgerAmendRateHistoryResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostLedgerAmendRateHistoryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostLedgerAmendRateHistoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostLedgerAmendRateHistoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostLedgerAmendRateHistoryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerCheckpointsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LedgerCheckpoints
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerCheckpointsResponse) GetJSON200() *LedgerCheckpoints {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerCheckpointsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetLedgerCheckpointsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerCheckpointsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerCheckpointsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerCheckpointsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerCheckpointsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerMigrationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LedgerMigration
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerMigrationResponse) GetJSON200() *LedgerMigration {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerMigrationResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetLedgerMigrationResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerMigrationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerMigrationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerMigrationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerMigrationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerOpenapiJsonResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *map[string]interface{}
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerOpenapiJsonResponse) GetJSON200() *map[string]interface{} {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerOpenapiJsonResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetLedgerOpenapiJsonResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerOpenapiJsonResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerOpenapiJsonResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerOpenapiJsonResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerOpenapiJsonResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerReconciliationResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LedgerReconciliation
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerReconciliationResponse) GetJSON200() *LedgerReconciliation {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerReconciliationResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetLedgerReconciliationResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerReconciliationResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerReconciliationResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerReconciliationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerReconciliationResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostLedgerRecoveryListResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ListView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostLedgerRecoveryListResponse) GetJSON200() *ListView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostLedgerRecoveryListResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostLedgerRecoveryListResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostLedgerRecoveryListResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostLedgerRecoveryListResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostLedgerRecoveryListResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostLedgerRecoveryListResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostLedgerRecoveryListResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostLedgerRecoveryListResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostLedgerRecoveryResolveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *ItemView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostLedgerRecoveryResolveResponse) GetJSON200() *ItemView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostLedgerRecoveryResolveResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostLedgerRecoveryResolveResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostLedgerRecoveryResolveResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PostLedgerRecoveryResolveResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostLedgerRecoveryResolveResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostLedgerRecoveryResolveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostLedgerRecoveryResolveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostLedgerRecoveryResolveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostLedgerRecoveryResolveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetLedgerTotalsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *LedgerTotals
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetLedgerTotalsResponse) GetJSON200() *LedgerTotals {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetLedgerTotalsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetLedgerTotalsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetLedgerTotalsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetLedgerTotalsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetLedgerTotalsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetLedgerTotalsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetModelsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11201,6 +17530,8 @@ type GetModelsResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11221,6 +17552,11 @@ func (r GetModelsResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetModelsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetModelsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11263,6 +17599,8 @@ type GetOpenapiJsonResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11283,6 +17621,11 @@ func (r GetOpenapiJsonResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetOpenapiJsonResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetOpenapiJsonResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11331,6 +17674,8 @@ type DeleteOverlaySectionResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11368,6 +17713,11 @@ func (r DeleteOverlaySectionResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeleteOverlaySectionResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r DeleteOverlaySectionResponse) GetBody() []byte {
 	return r.Body
@@ -11397,6 +17747,158 @@ func (r DeleteOverlaySectionResponse) ContentType() string {
 	return ""
 }
 
+type GetPlaneFactsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PlaneFactsView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetPlaneFactsResponse) GetJSON200() *PlaneFactsView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r GetPlaneFactsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetPlaneFactsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetPlaneFactsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPlaneFactsResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetPlaneFactsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPlaneFactsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPlaneFactsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetPlaneFactsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostPlaneRecordWriteResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PlaneRecordWriteView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON200() *PlaneRecordWriteView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostPlaneRecordWriteResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostPlaneRecordWriteResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostPlaneRecordWriteResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostPlaneRecordWriteResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostPlaneRecordWriteResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetPluginsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -11410,6 +17912,8 @@ type GetPluginsResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11435,6 +17939,11 @@ func (r GetPluginsResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPluginsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPluginsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11483,6 +17992,8 @@ type PostPluginsResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON201 returns the response for an HTTP 201 `application/json` response
@@ -11518,6 +18029,11 @@ func (r PostPluginsResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostPluginsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostPluginsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11564,6 +18080,8 @@ type PostPluginsInspectResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11594,6 +18112,11 @@ func (r PostPluginsInspectResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostPluginsInspectResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostPluginsInspectResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11640,6 +18163,8 @@ type PostPluginsReloadResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11670,6 +18195,11 @@ func (r PostPluginsReloadResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostPluginsReloadResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostPluginsReloadResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11720,6 +18250,8 @@ type PostPluginsRollbackResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11760,6 +18292,11 @@ func (r PostPluginsRollbackResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostPluginsRollbackResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostPluginsRollbackResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11806,6 +18343,8 @@ type DeletePluginsFileResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON400 returns the response for an HTTP 400 `application/json` response
@@ -11836,6 +18375,11 @@ func (r DeletePluginsFileResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r DeletePluginsFileResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r DeletePluginsFileResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11880,6 +18424,8 @@ type GetPluginsFileSchemaResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11905,6 +18451,11 @@ func (r GetPluginsFileSchemaResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPluginsFileSchemaResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPluginsFileSchemaResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -11949,6 +18500,8 @@ type GetPoolsResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -11974,6 +18527,11 @@ func (r GetPoolsResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPoolsResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPoolsResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -12018,6 +18576,8 @@ type GetPoolsNameResponse struct {
 	JSON404 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -12043,6 +18603,11 @@ func (r GetPoolsNameResponse) GetJSON404() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetPoolsNameResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetPoolsNameResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -12085,6 +18650,8 @@ type GetProvidersResponse struct {
 	JSON403 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -12105,6 +18672,11 @@ func (r GetProvidersResponse) GetJSON403() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetProvidersResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetProvidersResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -12153,6 +18725,8 @@ type PostRestartResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON202 returns the response for an HTTP 202 `application/json` response
@@ -12188,6 +18762,11 @@ func (r PostRestartResponse) GetJSON429() *Error {
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r PostRestartResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostRestartResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -12234,6 +18813,8 @@ type PostSigningKeyRotateResponse struct {
 	JSON429 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -12266,6 +18847,11 @@ func (r PostSigningKeyRotateResponse) GetJSON500() *Error {
 	return r.JSON500
 }
 
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostSigningKeyRotateResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
 // GetBody returns the raw response body bytes
 func (r PostSigningKeyRotateResponse) GetBody() []byte {
 	return r.Body
@@ -12295,6 +18881,897 @@ func (r PostSigningKeyRotateResponse) ContentType() string {
 	return ""
 }
 
+type PostStoreRestoreResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostStoreRestoreResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostStoreRestoreResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostStoreRestoreResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostStoreRestoreResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostStoreRestoreResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostStoreRestoreResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostStoreRestoreResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostStoreRestoreResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostStoreRestoreResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetToolsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PageNamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsResponse) GetJSON200() *PageNamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteToolsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r DeleteToolsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteToolsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteToolsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteToolsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteToolsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetToolsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetToolsNameResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutToolsNameResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutToolsNameResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PutToolsNameResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PutToolsNameResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PutToolsNameResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PutToolsNameResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PutToolsNameResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PutToolsNameResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PutToolsNameResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutToolsNameResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutToolsNameResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutToolsNameResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetToolsNameChangesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *McpTrustView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON200() *McpTrustView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsNameChangesResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsNameChangesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsNameChangesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsNameChangesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsNameChangesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostToolsNameConnectResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *McpTrustView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON200() *McpTrustView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PostToolsNameConnectResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PostToolsNameConnectResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostToolsNameConnectResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostToolsNameConnectResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostToolsNameConnectResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetToolsNameHealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *McpHealthView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON200() *McpHealthView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r GetToolsNameHealthResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r GetToolsNameHealthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetToolsNameHealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetToolsNameHealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetToolsNameHealthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PatchToolsNameSettingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *NamedDefView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON429 the response for an HTTP 429 `application/json` response
+	JSON429 *Error
+	// JSON500 the response for an HTTP 500 `application/json` response
+	JSON500 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON200() *NamedDefView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON429 returns the response for an HTTP 429 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON429() *Error {
+	return r.JSON429
+}
+
+// GetJSON500 returns the response for an HTTP 500 `application/json` response
+func (r PatchToolsNameSettingsResponse) GetJSON500() *Error {
+	return r.JSON500
+}
+
+// GetBody returns the raw response body bytes
+func (r PatchToolsNameSettingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PatchToolsNameSettingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PatchToolsNameSettingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PatchToolsNameSettingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTrustResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrustListView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTrustResponse) GetJSON200() *TrustListView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetTrustResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetTrustResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTrustResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTrustResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTrustResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTrustResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostTrustApproveResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrustKeyView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostTrustApproveResponse) GetJSON200() *TrustKeyView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostTrustApproveResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostTrustApproveResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostTrustApproveResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostTrustApproveResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r PostTrustApproveResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostTrustApproveResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostTrustApproveResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostTrustApproveResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostTrustApproveResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostTrustApproveResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PostTrustRevokeResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TrustKeyView
+	// JSON400 the response for an HTTP 400 `application/json` response
+	JSON400 *Error
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON403 the response for an HTTP 403 `application/json` response
+	JSON403 *Error
+	// JSON404 the response for an HTTP 404 `application/json` response
+	JSON404 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PostTrustRevokeResponse) GetJSON200() *TrustKeyView {
+	return r.JSON200
+}
+
+// GetJSON400 returns the response for an HTTP 400 `application/json` response
+func (r PostTrustRevokeResponse) GetJSON400() *Error {
+	return r.JSON400
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r PostTrustRevokeResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON403 returns the response for an HTTP 403 `application/json` response
+func (r PostTrustRevokeResponse) GetJSON403() *Error {
+	return r.JSON403
+}
+
+// GetJSON404 returns the response for an HTTP 404 `application/json` response
+func (r PostTrustRevokeResponse) GetJSON404() *Error {
+	return r.JSON404
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r PostTrustRevokeResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r PostTrustRevokeResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PostTrustRevokeResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PostTrustRevokeResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PostTrustRevokeResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type GetUsageResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -12306,8 +19783,12 @@ type GetUsageResponse struct {
 	JSON401 *Error
 	// JSON403 the response for an HTTP 403 `application/json` response
 	JSON403 *Error
+	// JSON409 the response for an HTTP 409 `application/json` response
+	JSON409 *Error
 	// JSON500 the response for an HTTP 500 `application/json` response
 	JSON500 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
 }
 
 // GetJSON200 returns the response for an HTTP 200 `application/json` response
@@ -12330,9 +19811,19 @@ func (r GetUsageResponse) GetJSON403() *Error {
 	return r.JSON403
 }
 
+// GetJSON409 returns the response for an HTTP 409 `application/json` response
+func (r GetUsageResponse) GetJSON409() *Error {
+	return r.JSON409
+}
+
 // GetJSON500 returns the response for an HTTP 500 `application/json` response
 func (r GetUsageResponse) GetJSON500() *Error {
 	return r.JSON500
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetUsageResponse) GetJSON503() *Error {
+	return r.JSON503
 }
 
 // GetBody returns the raw response body bytes
@@ -12362,6 +19853,91 @@ func (r GetUsageResponse) ContentType() string {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
 	return ""
+}
+
+type GetVerifyResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *VerifyView
+	// JSON401 the response for an HTTP 401 `application/json` response
+	JSON401 *Error
+	// JSON503 the response for an HTTP 503 `application/json` response
+	JSON503 *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetVerifyResponse) GetJSON200() *VerifyView {
+	return r.JSON200
+}
+
+// GetJSON401 returns the response for an HTTP 401 `application/json` response
+func (r GetVerifyResponse) GetJSON401() *Error {
+	return r.JSON401
+}
+
+// GetJSON503 returns the response for an HTTP 503 `application/json` response
+func (r GetVerifyResponse) GetJSON503() *Error {
+	return r.JSON503
+}
+
+// GetBody returns the raw response body bytes
+func (r GetVerifyResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetVerifyResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetVerifyResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetVerifyResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// PostAdjustWithBodyWithResponse Correct a key's COUNTS by a signed delta, never a money figure
+//
+// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+func (c *ClientWithResponses) PostAdjustWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAdjustResponse, error) {
+	rsp, err := c.PostAdjustWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAdjustResponse(rsp)
+}
+
+// PostAdjustWithResponse Correct a key's COUNTS by a signed delta, never a money figure
+//
+// Money is the one ledger's counts x the rate card, so a correction moves counts: a signed delta per class on the key's counts for one lane and one history entry, applied at once, all or nothing, to the key's own budget bucket and each group bucket the named pool takes part in, and kept beside the day's metering rows so `GET /admin/usage` serves the counts as adjusted. A delta that would take any count below zero, or names counts the day's metering does not hold, is refused and nothing is applied.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/adjust (the `PostAdjust` operationId).
+func (c *ClientWithResponses) PostAdjustWithResponse(ctx context.Context, body PostAdjustJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAdjustResponse, error) {
+	rsp, err := c.PostAdjust(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAdjustResponse(rsp)
 }
 
 // GetAdminAuthWithResponse Admin-plane auth config (the admin surface guard)
@@ -12403,6 +19979,136 @@ func (c *ClientWithResponses) PutAdminAuthWithResponse(ctx context.Context, para
 	return ParsePutAdminAuthResponse(rsp)
 }
 
+// GetAgentsWithResponse Every `agents:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/agents (the `GetAgents` operationId).
+func (c *ClientWithResponses) GetAgentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAgentsResponse, error) {
+	rsp, err := c.GetAgents(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentsResponse(rsp)
+}
+
+// DeleteAgentsNameWithResponse Remove one `agents:` definition, refused while another config section still references it by bare name
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/admin/agents/{name} (the `DeleteAgentsName` operationId).
+func (c *ClientWithResponses) DeleteAgentsNameWithResponse(ctx context.Context, name string, params *DeleteAgentsNameParams, reqEditors ...RequestEditorFn) (*DeleteAgentsNameResponse, error) {
+	rsp, err := c.DeleteAgentsName(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteAgentsNameResponse(rsp)
+}
+
+// GetAgentsNameWithResponse One `agents:` definition
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/agents/{name} (the `GetAgentsName` operationId).
+func (c *ClientWithResponses) GetAgentsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetAgentsNameResponse, error) {
+	rsp, err := c.GetAgentsName(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentsNameResponse(rsp)
+}
+
+// PutAgentsNameWithBodyWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *ClientWithResponses) PutAgentsNameWithBodyWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error) {
+	rsp, err := c.PutAgentsNameWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutAgentsNameResponse(rsp)
+}
+
+// PutAgentsNameWithResponse Create or REPLACE one `agents:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/agents/{name} (the `PutAgentsName` operationId).
+func (c *ClientWithResponses) PutAgentsNameWithResponse(ctx context.Context, name string, params *PutAgentsNameParams, body PutAgentsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutAgentsNameResponse, error) {
+	rsp, err := c.PutAgentsName(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutAgentsNameResponse(rsp)
+}
+
+// PostAgentsNameApproveWithBodyWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *ClientWithResponses) PostAgentsNameApproveWithBodyWithResponse(ctx context.Context, name string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error) {
+	rsp, err := c.PostAgentsNameApproveWithBody(ctx, name, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAgentsNameApproveResponse(rsp)
+}
+
+// PostAgentsNameApproveWithResponse Lock a registered agent to the card fingerprint the operator has SEEN. The card is re-fetched and re-verified, and an approval naming any other fingerprint is refused
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/approve (the `PostAgentsNameApprove` operationId).
+func (c *ClientWithResponses) PostAgentsNameApproveWithResponse(ctx context.Context, name string, body PostAgentsNameApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostAgentsNameApproveResponse, error) {
+	rsp, err := c.PostAgentsNameApprove(ctx, name, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAgentsNameApproveResponse(rsp)
+}
+
+// PostAgentsNameConnectWithResponse Fetch a registered agent's card, verify it against the operator's out-of-band root, and report the fingerprint. Approves nothing; the card it verified is recorded as the agent's card records, which an instance opened again serves from
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/agents/{name}/connect (the `PostAgentsNameConnect` operationId).
+func (c *ClientWithResponses) PostAgentsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostAgentsNameConnectResponse, error) {
+	rsp, err := c.PostAgentsNameConnect(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostAgentsNameConnectResponse(rsp)
+}
+
+// PatchAgentsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *ClientWithResponses) PatchAgentsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error) {
+	rsp, err := c.PatchAgentsNameSettingsWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchAgentsNameSettingsResponse(rsp)
+}
+
+// PatchAgentsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `agents:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/agents/{name}/settings (the `PatchAgentsNameSettings` operationId).
+func (c *ClientWithResponses) PatchAgentsNameSettingsWithResponse(ctx context.Context, name string, params *PatchAgentsNameSettingsParams, body PatchAgentsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchAgentsNameSettingsResponse, error) {
+	rsp, err := c.PatchAgentsNameSettings(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchAgentsNameSettingsResponse(rsp)
+}
+
 // GetAuditWithResponse Admin audit log: every mutation with its outcome (newest first). Page: ?limit=, ?cursor=; returns {items, next_cursor}
 //
 // Returns a wrapper object for the known response body format(s).
@@ -12414,6 +20120,51 @@ func (c *ClientWithResponses) GetAuditWithResponse(ctx context.Context, params *
 		return nil, err
 	}
 	return ParseGetAuditResponse(rsp)
+}
+
+// GetAuditHeadWithResponse The audit record chain's tip: position, digest, signature, key identifier and clock
+//
+// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/audit/head (the `GetAuditHead` operationId).
+func (c *ClientWithResponses) GetAuditHeadWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditHeadResponse, error) {
+	rsp, err := c.GetAuditHead(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditHeadResponse(rsp)
+}
+
+// GetAuditKeysWithResponse The public keys the audit chain is signed with
+//
+// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/audit/keys (the `GetAuditKeys` operationId).
+func (c *ClientWithResponses) GetAuditKeysWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetAuditKeysResponse, error) {
+	rsp, err := c.GetAuditKeys(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditKeysResponse(rsp)
+}
+
+// GetAuditRangeWithResponse Audit records by position, each with every field its digest was taken over
+//
+// A pull, never a push: the node answers and opens no connection. A read: it mutates nothing and is never posture-gated.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/audit/range (the `GetAuditRange` operationId).
+func (c *ClientWithResponses) GetAuditRangeWithResponse(ctx context.Context, params *GetAuditRangeParams, reqEditors ...RequestEditorFn) (*GetAuditRangeResponse, error) {
+	rsp, err := c.GetAuditRange(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAuditRangeResponse(rsp)
 }
 
 // GetAuthWithResponse Ingress auth chain + upstream-credential mode
@@ -12453,6 +20204,51 @@ func (c *ClientWithResponses) PostAuthCacheFlushWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParsePostAuthCacheFlushResponse(rsp)
+}
+
+// PostChainBreakWithResponse Deliberately break the journal chain (disaster recovery)
+//
+// Admitted through the same gates as every other new verb, then handed to the store. The request body is not read.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/chain-break (the `PostChainBreak` operationId).
+func (c *ClientWithResponses) PostChainBreakWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*PostChainBreakResponse, error) {
+	rsp, err := c.PostChainBreak(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostChainBreakResponse(rsp)
+}
+
+// PostCommitUpgradeWithBodyWithResponse Commit the fleet to the release this node runs
+//
+// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+func (c *ClientWithResponses) PostCommitUpgradeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostCommitUpgradeResponse, error) {
+	rsp, err := c.PostCommitUpgradeWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostCommitUpgradeResponse(rsp)
+}
+
+// PostCommitUpgradeWithResponse Commit the fleet to the release this node runs
+//
+// The body names the release; one this node does not run is refused and seals nothing. The committed release is sealed on the node journal before the answer names its position and chain hash. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first commit and seals nothing again.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/commit-upgrade (the `PostCommitUpgrade` operationId).
+func (c *ClientWithResponses) PostCommitUpgradeWithResponse(ctx context.Context, body PostCommitUpgradeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostCommitUpgradeResponse, error) {
+	rsp, err := c.PostCommitUpgrade(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostCommitUpgradeResponse(rsp)
 }
 
 // GetConfigWithResponse Effective running config snapshot (redacted)
@@ -12676,7 +20472,7 @@ func (c *ClientWithResponses) GetExportNameWithResponse(ctx context.Context, nam
 	return ParseGetExportNameResponse(rsp)
 }
 
-// PutExportNameWithBodyWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+// PutExportNameWithBodyWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -12689,7 +20485,7 @@ func (c *ClientWithResponses) PutExportNameWithBodyWithResponse(ctx context.Cont
 	return ParsePutExportNameResponse(rsp)
 }
 
-// PutExportNameWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml)
+// PutExportNameWithResponse Create or REPLACE one `export:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13053,7 +20849,7 @@ func (c *ClientWithResponses) GetIdentityProvidersNameWithResponse(ctx context.C
 	return ParseGetIdentityProvidersNameResponse(rsp)
 }
 
-// PutIdentityProvidersNameWithBodyWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+// PutIdentityProvidersNameWithBodyWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13066,7 +20862,7 @@ func (c *ClientWithResponses) PutIdentityProvidersNameWithBodyWithResponse(ctx c
 	return ParsePutIdentityProvidersNameResponse(rsp)
 }
 
-// PutIdentityProvidersNameWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and live after an atomic rebuild-and-swap. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
+// PutIdentityProvidersNameWithResponse Create or REPLACE one `identity-providers:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml); RAISING `max_admin_scope` is refused outright (the trust ceiling is operator file policy)
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13248,6 +21044,171 @@ func (c *ClientWithResponses) GetKeysIdUsageWithResponse(ctx context.Context, id
 	return ParseGetKeysIdUsageResponse(rsp)
 }
 
+// PostLedgerAmendRateHistoryWithBodyWithResponse Append a back-dated correction to the dated rate-card history
+//
+// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+func (c *ClientWithResponses) PostLedgerAmendRateHistoryWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerAmendRateHistoryResponse, error) {
+	rsp, err := c.PostLedgerAmendRateHistoryWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerAmendRateHistoryResponse(rsp)
+}
+
+// PostLedgerAmendRateHistoryWithResponse Append a back-dated correction to the dated rate-card history
+//
+// The correction out-ranks the entry it corrects and rewrites nothing; recompute reprices the corrected window against the new entry. A body carrying `currency` is refused. The durable record is written ahead of the append.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/ledger/amend-rate-history (the `PostLedgerAmendRateHistory` operationId).
+func (c *ClientWithResponses) PostLedgerAmendRateHistoryWithResponse(ctx context.Context, body PostLedgerAmendRateHistoryJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerAmendRateHistoryResponse, error) {
+	rsp, err := c.PostLedgerAmendRateHistory(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerAmendRateHistoryResponse(rsp)
+}
+
+// GetLedgerCheckpointsWithResponse The sealed checkpoint figures
+//
+// Money is the one ledger's counts x the rate card, recomputed on every read, so no balance checkpoint is sealed and the list is empty. The shape is kept for clients that read it. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/ledger/checkpoints (the `GetLedgerCheckpoints` operationId).
+func (c *ClientWithResponses) GetLedgerCheckpointsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerCheckpointsResponse, error) {
+	rsp, err := c.GetLedgerCheckpoints(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerCheckpointsResponse(rsp)
+}
+
+// GetLedgerMigrationWithResponse The marker the first boot after the upgrade sealed
+//
+// The previous release's rows ARE the one ledger's counts, read as they are, so no migration is sealed: `migrated` is false and `marker` null. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/ledger/migration (the `GetLedgerMigration` operationId).
+func (c *ClientWithResponses) GetLedgerMigrationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerMigrationResponse, error) {
+	rsp, err := c.GetLedgerMigration(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerMigrationResponse(rsp)
+}
+
+// GetLedgerOpenapiJsonWithResponse The full administrative OpenAPI 3.1 document, served at the ledger's own path
+//
+// The committed, generated document, unfiltered: every operation this BUILD can serve, including each plane's. `GET /openapi.json` serves the same document filtered to the planes this node configured.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/ledger/openapi.json (the `GetLedgerOpenapiJson` operationId).
+func (c *ClientWithResponses) GetLedgerOpenapiJsonWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerOpenapiJsonResponse, error) {
+	rsp, err := c.GetLedgerOpenapiJson(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerOpenapiJsonResponse(rsp)
+}
+
+// GetLedgerReconciliationWithResponse Whether the one ledger prices whole
+//
+// There is one ledger, so there is no second set of figures to be out by: `discrepancies` is always empty, and `holds` is true unless a key's counts the rate card refused to price are named under `refused`. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/ledger/reconciliation (the `GetLedgerReconciliation` operationId).
+func (c *ClientWithResponses) GetLedgerReconciliationWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerReconciliationResponse, error) {
+	rsp, err := c.GetLedgerReconciliation(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerReconciliationResponse(rsp)
+}
+
+// PostLedgerRecoveryListWithBodyWithResponse Inspect retained raw ledger operations requiring recovery
+//
+// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+func (c *ClientWithResponses) PostLedgerRecoveryListWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryListResponse, error) {
+	rsp, err := c.PostLedgerRecoveryListWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerRecoveryListResponse(rsp)
+}
+
+// PostLedgerRecoveryListWithResponse Inspect retained raw ledger operations requiring recovery
+//
+// An observation-only POST requiring full scope and the ordinary CRUD budget. The opaque cursor belongs to this list; default limit 200, maximum 1000. Rows contain immutable operation identities and recovery versions, never raw bodies or mutable dollar balances. Listing does not grant resolution authority; can_resolve describes only this node's current authority.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/list (the `PostLedgerRecoveryList` operationId).
+func (c *ClientWithResponses) PostLedgerRecoveryListWithResponse(ctx context.Context, body PostLedgerRecoveryListJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryListResponse, error) {
+	rsp, err := c.PostLedgerRecoveryList(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerRecoveryListResponse(rsp)
+}
+
+// PostLedgerRecoveryResolveWithBodyWithResponse Record an explicit landed or not-landed verdict for an exact retained operation
+//
+// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+func (c *ClientWithResponses) PostLedgerRecoveryResolveWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryResolveResponse, error) {
+	rsp, err := c.PostLedgerRecoveryResolveWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerRecoveryResolveResponse(rsp)
+}
+
+// PostLedgerRecoveryResolveWithResponse Record an explicit landed or not-landed verdict for an exact retained operation
+//
+// Requires full scope, the original operation id and immutable body fingerprint, the inspected recovery version and nonempty evidence (at most 1024 bytes). The instance-bound recovery facade checks current authority and confirms a durable, attributed verdict before reposting or releasing dependent negative work. An expired receipt never proves not-landed. The same verdict, version, actor and reason replays its durable outcome; a conflicting retry is refused. The Store operation survives cancellation of the HTTP waiter. No raw payload, credential or mutable dollar balance is returned.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/ledger/recovery/resolve (the `PostLedgerRecoveryResolve` operationId).
+func (c *ClientWithResponses) PostLedgerRecoveryResolveWithResponse(ctx context.Context, body PostLedgerRecoveryResolveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostLedgerRecoveryResolveResponse, error) {
+	rsp, err := c.PostLedgerRecoveryResolve(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostLedgerRecoveryResolveResponse(rsp)
+}
+
+// GetLedgerTotalsWithResponse What the one ledger's counts come to, per key
+//
+// Each key's usage counts priced by the one function against the rate card each era was earned under — the figure `GET /keys/{id}/usage` derives. A key whose counts the rate card refused to price is withheld and named under `refused`; every other key with anything counted is served. A read: it mutates nothing, is never posture-gated, and needs no more authority than `GET /usage`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/ledger/totals (the `GetLedgerTotals` operationId).
+func (c *ClientWithResponses) GetLedgerTotalsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetLedgerTotalsResponse, error) {
+	rsp, err := c.GetLedgerTotals(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetLedgerTotalsResponse(rsp)
+}
+
 // GetModelsWithResponse Model lanes + upstream providers
 //
 // Returns a wrapper object for the known response body format(s).
@@ -13274,7 +21235,7 @@ func (c *ClientWithResponses) GetOpenapiJsonWithResponse(ctx context.Context, re
 	return ParseGetOpenapiJsonResponse(rsp)
 }
 
-// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
+// DeleteOverlaySectionWithResponse DISCARD a section's overlay mutations and revert it to base config.yaml (section ∈ groups|hooks|root|plugin_versions|identity-providers|export|tools|agents). Per-section reset: the OTHER sections' overlay survives. A NEW config version; an already-empty section is an idempotent no-op (changed:false)
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -13285,6 +21246,51 @@ func (c *ClientWithResponses) DeleteOverlaySectionWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseDeleteOverlaySectionResponse(rsp)
+}
+
+// GetPlaneFactsWithResponse What a plane this node serves declares about itself
+//
+// The plane's registry key, config sections, grant kinds, nouns, billable classes, fee units, metric families and served operation classes. A read: it mutates nothing and needs `read-only`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/plane-facts (the `GetPlaneFacts` operationId).
+func (c *ClientWithResponses) GetPlaneFactsWithResponse(ctx context.Context, params *GetPlaneFactsParams, reqEditors ...RequestEditorFn) (*GetPlaneFactsResponse, error) {
+	rsp, err := c.GetPlaneFacts(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPlaneFactsResponse(rsp)
+}
+
+// PostPlaneRecordWriteWithBodyWithResponse Upsert one record of a plane this node serves
+//
+// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+func (c *ClientWithResponses) PostPlaneRecordWriteWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostPlaneRecordWriteResponse, error) {
+	rsp, err := c.PostPlaneRecordWriteWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostPlaneRecordWriteResponse(rsp)
+}
+
+// PostPlaneRecordWriteWithResponse Upsert one record of a plane this node serves
+//
+// Upserted by `(kind, id)` through the plane-facing store the planes persist through, and only for a `kind` the named plane declares in its `record_kinds` (`GET /plane-facts` lists them). `body` is stored as its JSON bytes and never decoded by the store; `terminal` is the retention disposition. Honors an `Idempotency-Key` header (per-principal, ~10min replay): a retry with the same key and body answers the first answer.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/plane-record-write (the `PostPlaneRecordWrite` operationId).
+func (c *ClientWithResponses) PostPlaneRecordWriteWithResponse(ctx context.Context, body PostPlaneRecordWriteJSONRequestBody, reqEditors ...RequestEditorFn) (*PostPlaneRecordWriteResponse, error) {
+	rsp, err := c.PostPlaneRecordWrite(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostPlaneRecordWriteResponse(rsp)
 }
 
 // GetPluginsWithResponse Plugin catalog by type (compiled-in + external + dynamic-library)
@@ -13495,6 +21501,241 @@ func (c *ClientWithResponses) PostSigningKeyRotateWithResponse(ctx context.Conte
 	return ParsePostSigningKeyRotateResponse(rsp)
 }
 
+// PostStoreRestoreWithBodyWithResponse Refused: the configured store has no restore operation (disaster recovery)
+//
+// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+func (c *ClientWithResponses) PostStoreRestoreWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostStoreRestoreResponse, error) {
+	rsp, err := c.PostStoreRestoreWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostStoreRestoreResponse(rsp)
+}
+
+// PostStoreRestoreWithResponse Refused: the configured store has no restore operation (disaster recovery)
+//
+// Refused, always: the configured store has no restore operation, so this node restores nothing, records nothing and changes nothing. Restores happen off-node, with the store's own tooling. A body that names no `backup_ref` is refused 400 before anything else; an admitted call is refused 503 `unavailable`, and the node logs one error line naming the verb.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/store-restore (the `PostStoreRestore` operationId).
+func (c *ClientWithResponses) PostStoreRestoreWithResponse(ctx context.Context, body PostStoreRestoreJSONRequestBody, reqEditors ...RequestEditorFn) (*PostStoreRestoreResponse, error) {
+	rsp, err := c.PostStoreRestore(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostStoreRestoreResponse(rsp)
+}
+
+// GetToolsWithResponse Every `tools:` DEFINITION (the 1.5.3 named-definition map: name -> {module, settings, ...}, referenced by bare name). Secrets are never projected
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools (the `GetTools` operationId).
+func (c *ClientWithResponses) GetToolsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetToolsResponse, error) {
+	rsp, err := c.GetTools(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsResponse(rsp)
+}
+
+// DeleteToolsNameWithResponse Remove one `tools:` definition, refused while another config section still references it by bare name
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /api/v1/admin/tools/{name} (the `DeleteToolsName` operationId).
+func (c *ClientWithResponses) DeleteToolsNameWithResponse(ctx context.Context, name string, params *DeleteToolsNameParams, reqEditors ...RequestEditorFn) (*DeleteToolsNameResponse, error) {
+	rsp, err := c.DeleteToolsName(ctx, name, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteToolsNameResponse(rsp)
+}
+
+// GetToolsNameWithResponse One `tools:` definition
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools/{name} (the `GetToolsName` operationId).
+func (c *ClientWithResponses) GetToolsNameWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameResponse, error) {
+	rsp, err := c.GetToolsName(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsNameResponse(rsp)
+}
+
+// PutToolsNameWithBodyWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *ClientWithResponses) PutToolsNameWithBodyWithResponse(ctx context.Context, name string, params *PutToolsNameParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error) {
+	rsp, err := c.PutToolsNameWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutToolsNameResponse(rsp)
+}
+
+// PutToolsNameWithResponse Create or REPLACE one `tools:` definition (upsert), persisted to the config overlay and applied by an atomic config swap. Boot-bound changes are reported in `reload_to_apply`; export instance membership, module and streams/fields projections require restart for push delivery, while existing same-module settings refresh live. A base-config-defined entry is 409 (edit config.yaml)
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /api/v1/admin/tools/{name} (the `PutToolsName` operationId).
+func (c *ClientWithResponses) PutToolsNameWithResponse(ctx context.Context, name string, params *PutToolsNameParams, body PutToolsNameJSONRequestBody, reqEditors ...RequestEditorFn) (*PutToolsNameResponse, error) {
+	rsp, err := c.PutToolsName(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutToolsNameResponse(rsp)
+}
+
+// GetToolsNameChangesWithResponse The changes queue for one MCP server, derived from the LAST observation. Contacts nothing
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/changes (the `GetToolsNameChanges` operationId).
+func (c *ClientWithResponses) GetToolsNameChangesWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameChangesResponse, error) {
+	rsp, err := c.GetToolsNameChanges(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsNameChangesResponse(rsp)
+}
+
+// PostToolsNameConnectWithResponse Fetch a registered MCP server's LIVE tool list, hash it, and record the observation. Approves nothing: adopting what was seen is a separate operator act
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/tools/{name}/connect (the `PostToolsNameConnect` operationId).
+func (c *ClientWithResponses) PostToolsNameConnectWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*PostToolsNameConnectResponse, error) {
+	rsp, err := c.PostToolsNameConnect(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostToolsNameConnectResponse(rsp)
+}
+
+// GetToolsNameHealthWithResponse Whether one MCP server currently serves, and why not when it does not
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/tools/{name}/health (the `GetToolsNameHealth` operationId).
+func (c *ClientWithResponses) GetToolsNameHealthWithResponse(ctx context.Context, name string, reqEditors ...RequestEditorFn) (*GetToolsNameHealthResponse, error) {
+	rsp, err := c.GetToolsNameHealth(ctx, name, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetToolsNameHealthResponse(rsp)
+}
+
+// PatchToolsNameSettingsWithBodyWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *ClientWithResponses) PatchToolsNameSettingsWithBodyWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error) {
+	rsp, err := c.PatchToolsNameSettingsWithBody(ctx, name, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchToolsNameSettingsResponse(rsp)
+}
+
+// PatchToolsNameSettingsWithResponse Replace ONLY the opaque `settings:` bag of one `tools:` definition; every other field is left byte-identical
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /api/v1/admin/tools/{name}/settings (the `PatchToolsNameSettings` operationId).
+func (c *ClientWithResponses) PatchToolsNameSettingsWithResponse(ctx context.Context, name string, params *PatchToolsNameSettingsParams, body PatchToolsNameSettingsJSONRequestBody, reqEditors ...RequestEditorFn) (*PatchToolsNameSettingsResponse, error) {
+	rsp, err := c.PatchToolsNameSettings(ctx, name, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePatchToolsNameSettingsResponse(rsp)
+}
+
+// GetTrustWithResponse Every trust key of the kernel's trust book and its state
+//
+// The counterparties every plane instance this node serves declares, and the items sighted or approved at each: its key, state, what it is approved at and what it was last sighted at. A read: it mutates nothing and needs `read-only`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/trust (the `GetTrust` operationId).
+func (c *ClientWithResponses) GetTrustWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetTrustResponse, error) {
+	rsp, err := c.GetTrust(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTrustResponse(rsp)
+}
+
+// PostTrustApproveWithBodyWithResponse Approve one trust key at what it was last sighted at
+//
+// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+func (c *ClientWithResponses) PostTrustApproveWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTrustApproveResponse, error) {
+	rsp, err := c.PostTrustApproveWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostTrustApproveResponse(rsp)
+}
+
+// PostTrustApproveWithResponse Approve one trust key at what it was last sighted at
+//
+// A counterparty is approved at the catalogue hash it last reported, which clears its quarantine; an item at the digest it was last sighted at. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/trust/approve (the `PostTrustApprove` operationId).
+func (c *ClientWithResponses) PostTrustApproveWithResponse(ctx context.Context, body PostTrustApproveJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTrustApproveResponse, error) {
+	rsp, err := c.PostTrustApprove(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostTrustApproveResponse(rsp)
+}
+
+// PostTrustRevokeWithBodyWithResponse Revoke one trust key
+//
+// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+func (c *ClientWithResponses) PostTrustRevokeWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PostTrustRevokeResponse, error) {
+	rsp, err := c.PostTrustRevokeWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostTrustRevokeResponse(rsp)
+}
+
+// PostTrustRevokeWithResponse Revoke one trust key
+//
+// Refused until approved again: a counterparty revoked refuses everything at it, an item revoked refuses it over its configured approval. The decision is kept durably and outlives a restart. Idempotent: the same key twice answers the same row.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /api/v1/admin/trust/revoke (the `PostTrustRevoke` operationId).
+func (c *ClientWithResponses) PostTrustRevokeWithResponse(ctx context.Context, body PostTrustRevokeJSONRequestBody, reqEditors ...RequestEditorFn) (*PostTrustRevokeResponse, error) {
+	rsp, err := c.PostTrustRevoke(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePostTrustRevokeResponse(rsp)
+}
+
 // GetUsageWithResponse Metering: current UTC-day bucket ({window, as_of, currency, total, by_model, by_key}), raw token split + derived spend_micros
 //
 // Returns a wrapper object for the known response body format(s).
@@ -13508,9 +21749,96 @@ func (c *ClientWithResponses) GetUsageWithResponse(ctx context.Context, params *
 	return ParseGetUsageResponse(rsp)
 }
 
+// GetVerifyWithResponse Verify this node's ledger: checkpoints, sequences, the book and the identity
+//
+// Every sealed checkpoint must re-hash to its own body, no node's sequence may go backwards between two checkpoints, the book as it stands is measured against the last checkpoint, and the ledger's postings must reconcile with the previous release's rows. A failed verification is still a 200: `ok` is the answer and `findings` says why. A read: it mutates nothing and needs `read-only`.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /api/v1/admin/verify (the `GetVerify` operationId).
+func (c *ClientWithResponses) GetVerifyWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetVerifyResponse, error) {
+	rsp, err := c.GetVerify(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetVerifyResponse(rsp)
+}
+
+// ParsePostAdjustResponse parses an HTTP response from a PostAdjustWithResponse call
+func ParsePostAdjustResponse(rsp *http.Response) (result *PostAdjustResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostAdjustResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AdjustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetAdminAuthResponse parses an HTTP response from a GetAdminAuthWithResponse call
-func ParseGetAdminAuthResponse(rsp *http.Response) (*GetAdminAuthResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetAdminAuthResponse(rsp *http.Response) (result *GetAdminAuthResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -13520,6 +21848,7 @@ func ParseGetAdminAuthResponse(rsp *http.Response) (*GetAdminAuthResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -13550,14 +21879,26 @@ func ParseGetAdminAuthResponse(rsp *http.Response) (*GetAdminAuthResponse, error
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePutAdminAuthResponse parses an HTTP response from a PutAdminAuthWithResponse call
-func ParsePutAdminAuthResponse(rsp *http.Response) (*PutAdminAuthResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePutAdminAuthResponse(rsp *http.Response) (result *PutAdminAuthResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -13567,6 +21908,7 @@ func ParsePutAdminAuthResponse(rsp *http.Response) (*PutAdminAuthResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -13618,81 +21960,40 @@ func ParsePutAdminAuthResponse(rsp *http.Response) (*PutAdminAuthResponse, error
 		}
 		response.JSON500 = &dest
 
-	}
-
-	return response, nil
-}
-
-// ParseGetAuditResponse parses an HTTP response from a GetAuditWithResponse call
-func ParseGetAuditResponse(rsp *http.Response) (*GetAuditResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetAuditResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest AuditPageView
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
+		response.JSON503 = &dest
 
 	}
 
 	return response, nil
 }
 
-// ParseGetAuthResponse parses an HTTP response from a GetAuthWithResponse call
-func ParseGetAuthResponse(rsp *http.Response) (*GetAuthResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+// ParseGetAgentsResponse parses an HTTP response from a GetAgentsWithResponse call
+func ParseGetAgentsResponse(rsp *http.Response) (result *GetAgentsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetAuthResponse{
+	response := &GetAgentsResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest AuthView
+		var dest PageNamedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -13724,26 +22025,28 @@ func ParseGetAuthResponse(rsp *http.Response) (*GetAuthResponse, error) {
 	return response, nil
 }
 
-// ParsePostAuthCacheFlushResponse parses an HTTP response from a PostAuthCacheFlushWithResponse call
-func ParsePostAuthCacheFlushResponse(rsp *http.Response) (*PostAuthCacheFlushResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+// ParseDeleteAgentsNameResponse parses an HTTP response from a DeleteAgentsNameWithResponse call
+func ParseDeleteAgentsNameResponse(rsp *http.Response) (result *DeleteAgentsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostAuthCacheFlushResponse{
+	response := &DeleteAgentsNameResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest CacheFlushView
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
@@ -13765,6 +22068,20 @@ func ParsePostAuthCacheFlushResponse(rsp *http.Response) (*PostAuthCacheFlushRes
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
 		var dest Error
@@ -13785,22 +22102,28 @@ func ParsePostAuthCacheFlushResponse(rsp *http.Response) (*PostAuthCacheFlushRes
 	return response, nil
 }
 
-// ParseGetConfigResponse parses an HTTP response from a GetConfigWithResponse call
-func ParseGetConfigResponse(rsp *http.Response) (*GetConfigResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+// ParseGetAgentsNameResponse parses an HTTP response from a GetAgentsNameWithResponse call
+func ParseGetAgentsNameResponse(rsp *http.Response) (result *GetAgentsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetConfigResponse{
+	response := &GetAgentsNameResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest EffectiveConfigView
+		var dest NamedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -13820,6 +22143,13 @@ func ParseGetConfigResponse(rsp *http.Response) (*GetConfigResponse, error) {
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -13832,22 +22162,28 @@ func ParseGetConfigResponse(rsp *http.Response) (*GetConfigResponse, error) {
 	return response, nil
 }
 
-// ParsePostConfigApplyResponse parses an HTTP response from a PostConfigApplyWithResponse call
-func ParsePostConfigApplyResponse(rsp *http.Response) (*PostConfigApplyResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+// ParsePutAgentsNameResponse parses an HTTP response from a PutAgentsNameWithResponse call
+func ParsePutAgentsNameResponse(rsp *http.Response) (result *PutAgentsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &PostConfigApplyResponse{
+	response := &PutAgentsNameResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest ConfigApplyView
+		var dest NamedDefView
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -13900,9 +22236,867 @@ func ParsePostConfigApplyResponse(rsp *http.Response) (*PostConfigApplyResponse,
 	return response, nil
 }
 
+// ParsePostAgentsNameApproveResponse parses an HTTP response from a PostAgentsNameApproveWithResponse call
+func ParsePostAgentsNameApproveResponse(rsp *http.Response) (result *PostAgentsNameApproveResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostAgentsNameApproveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest A2aTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostAgentsNameConnectResponse parses an HTTP response from a PostAgentsNameConnectWithResponse call
+func ParsePostAgentsNameConnectResponse(rsp *http.Response) (result *PostAgentsNameConnectResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostAgentsNameConnectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest A2aTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchAgentsNameSettingsResponse parses an HTTP response from a PatchAgentsNameSettingsWithResponse call
+func ParsePatchAgentsNameSettingsResponse(rsp *http.Response) (result *PatchAgentsNameSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchAgentsNameSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditResponse parses an HTTP response from a GetAuditWithResponse call
+func ParseGetAuditResponse(rsp *http.Response) (result *GetAuditResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditPageView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditHeadResponse parses an HTTP response from a GetAuditHeadWithResponse call
+func ParseGetAuditHeadResponse(rsp *http.Response) (result *GetAuditHeadResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditHeadResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditChainHeadView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditKeysResponse parses an HTTP response from a GetAuditKeysWithResponse call
+func ParseGetAuditKeysResponse(rsp *http.Response) (result *GetAuditKeysResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditKeysResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditChainKeysView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuditRangeResponse parses an HTTP response from a GetAuditRangeWithResponse call
+func ParseGetAuditRangeResponse(rsp *http.Response) (result *GetAuditRangeResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuditRangeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuditChainRangeView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAuthResponse parses an HTTP response from a GetAuthWithResponse call
+func ParseGetAuthResponse(rsp *http.Response) (result *GetAuthResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AuthView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostAuthCacheFlushResponse parses an HTTP response from a PostAuthCacheFlushWithResponse call
+func ParsePostAuthCacheFlushResponse(rsp *http.Response) (result *PostAuthCacheFlushResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostAuthCacheFlushResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CacheFlushView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostChainBreakResponse parses an HTTP response from a PostChainBreakWithResponse call
+func ParsePostChainBreakResponse(rsp *http.Response) (result *PostChainBreakResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostChainBreakResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostCommitUpgradeResponse parses an HTTP response from a PostCommitUpgradeWithResponse call
+func ParsePostCommitUpgradeResponse(rsp *http.Response) (result *PostCommitUpgradeResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostCommitUpgradeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CommitUpgradeView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetConfigResponse parses an HTTP response from a GetConfigWithResponse call
+func ParseGetConfigResponse(rsp *http.Response) (result *GetConfigResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetConfigResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EffectiveConfigView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostConfigApplyResponse parses an HTTP response from a PostConfigApplyWithResponse call
+func ParsePostConfigApplyResponse(rsp *http.Response) (result *PostConfigApplyResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostConfigApplyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ConfigApplyView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseGetConfigDiffResponse parses an HTTP response from a GetConfigDiffWithResponse call
-func ParseGetConfigDiffResponse(rsp *http.Response) (*GetConfigDiffResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetConfigDiffResponse(rsp *http.Response) (result *GetConfigDiffResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -13912,6 +23106,7 @@ func ParseGetConfigDiffResponse(rsp *http.Response) (*GetConfigDiffResponse, err
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -13956,14 +23151,26 @@ func ParseGetConfigDiffResponse(rsp *http.Response) (*GetConfigDiffResponse, err
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostConfigReloadResponse parses an HTTP response from a PostConfigReloadWithResponse call
-func ParsePostConfigReloadResponse(rsp *http.Response) (*PostConfigReloadResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostConfigReloadResponse(rsp *http.Response) (result *PostConfigReloadResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -13973,6 +23180,7 @@ func ParsePostConfigReloadResponse(rsp *http.Response) (*PostConfigReloadRespons
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14017,14 +23225,26 @@ func ParsePostConfigReloadResponse(rsp *http.Response) (*PostConfigReloadRespons
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostConfigRollbackResponse parses an HTTP response from a PostConfigRollbackWithResponse call
-func ParsePostConfigRollbackResponse(rsp *http.Response) (*PostConfigRollbackResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostConfigRollbackResponse(rsp *http.Response) (result *PostConfigRollbackResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14034,6 +23254,7 @@ func ParsePostConfigRollbackResponse(rsp *http.Response) (*PostConfigRollbackRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14092,14 +23313,26 @@ func ParsePostConfigRollbackResponse(rsp *http.Response) (*PostConfigRollbackRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetConfigSettingsResponse parses an HTTP response from a GetConfigSettingsWithResponse call
-func ParseGetConfigSettingsResponse(rsp *http.Response) (*GetConfigSettingsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetConfigSettingsResponse(rsp *http.Response) (result *GetConfigSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14109,6 +23342,7 @@ func ParseGetConfigSettingsResponse(rsp *http.Response) (*GetConfigSettingsRespo
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14139,14 +23373,26 @@ func ParseGetConfigSettingsResponse(rsp *http.Response) (*GetConfigSettingsRespo
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePutConfigSettingsResponse parses an HTTP response from a PutConfigSettingsWithResponse call
-func ParsePutConfigSettingsResponse(rsp *http.Response) (*PutConfigSettingsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePutConfigSettingsResponse(rsp *http.Response) (result *PutConfigSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14156,6 +23402,7 @@ func ParsePutConfigSettingsResponse(rsp *http.Response) (*PutConfigSettingsRespo
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14207,14 +23454,26 @@ func ParsePutConfigSettingsResponse(rsp *http.Response) (*PutConfigSettingsRespo
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostConfigValidateResponse parses an HTTP response from a PostConfigValidateWithResponse call
-func ParsePostConfigValidateResponse(rsp *http.Response) (*PostConfigValidateResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostConfigValidateResponse(rsp *http.Response) (result *PostConfigValidateResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14224,6 +23483,7 @@ func ParsePostConfigValidateResponse(rsp *http.Response) (*PostConfigValidateRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14268,14 +23528,26 @@ func ParsePostConfigValidateResponse(rsp *http.Response) (*PostConfigValidateRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetConfigVersionsResponse parses an HTTP response from a GetConfigVersionsWithResponse call
-func ParseGetConfigVersionsResponse(rsp *http.Response) (*GetConfigVersionsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetConfigVersionsResponse(rsp *http.Response) (result *GetConfigVersionsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14285,6 +23557,7 @@ func ParseGetConfigVersionsResponse(rsp *http.Response) (*GetConfigVersionsRespo
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14322,14 +23595,26 @@ func ParseGetConfigVersionsResponse(rsp *http.Response) (*GetConfigVersionsRespo
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetConfigVersionsVResponse parses an HTTP response from a GetConfigVersionsVWithResponse call
-func ParseGetConfigVersionsVResponse(rsp *http.Response) (*GetConfigVersionsVResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetConfigVersionsVResponse(rsp *http.Response) (result *GetConfigVersionsVResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14339,6 +23624,7 @@ func ParseGetConfigVersionsVResponse(rsp *http.Response) (*GetConfigVersionsVRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14383,14 +23669,26 @@ func ParseGetConfigVersionsVResponse(rsp *http.Response) (*GetConfigVersionsVRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetExportResponse parses an HTTP response from a GetExportWithResponse call
-func ParseGetExportResponse(rsp *http.Response) (*GetExportResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetExportResponse(rsp *http.Response) (result *GetExportResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14400,6 +23698,7 @@ func ParseGetExportResponse(rsp *http.Response) (*GetExportResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14430,14 +23729,26 @@ func ParseGetExportResponse(rsp *http.Response) (*GetExportResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeleteExportNameResponse parses an HTTP response from a DeleteExportNameWithResponse call
-func ParseDeleteExportNameResponse(rsp *http.Response) (*DeleteExportNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeleteExportNameResponse(rsp *http.Response) (result *DeleteExportNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14447,8 +23758,16 @@ func ParseDeleteExportNameResponse(rsp *http.Response) (*DeleteExportNameRespons
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PendingRestartRemovalView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case rsp.StatusCode == 204:
 		break // No content-type
 
@@ -14501,14 +23820,26 @@ func ParseDeleteExportNameResponse(rsp *http.Response) (*DeleteExportNameRespons
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetExportNameResponse parses an HTTP response from a GetExportNameWithResponse call
-func ParseGetExportNameResponse(rsp *http.Response) (*GetExportNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetExportNameResponse(rsp *http.Response) (result *GetExportNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14518,6 +23849,7 @@ func ParseGetExportNameResponse(rsp *http.Response) (*GetExportNameResponse, err
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14555,14 +23887,26 @@ func ParseGetExportNameResponse(rsp *http.Response) (*GetExportNameResponse, err
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePutExportNameResponse parses an HTTP response from a PutExportNameWithResponse call
-func ParsePutExportNameResponse(rsp *http.Response) (*PutExportNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePutExportNameResponse(rsp *http.Response) (result *PutExportNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14572,6 +23916,7 @@ func ParsePutExportNameResponse(rsp *http.Response) (*PutExportNameResponse, err
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14623,14 +23968,26 @@ func ParsePutExportNameResponse(rsp *http.Response) (*PutExportNameResponse, err
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePatchExportNameSettingsResponse parses an HTTP response from a PatchExportNameSettingsWithResponse call
-func ParsePatchExportNameSettingsResponse(rsp *http.Response) (*PatchExportNameSettingsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePatchExportNameSettingsResponse(rsp *http.Response) (result *PatchExportNameSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14640,6 +23997,7 @@ func ParsePatchExportNameSettingsResponse(rsp *http.Response) (*PatchExportNameS
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14698,14 +24056,26 @@ func ParsePatchExportNameSettingsResponse(rsp *http.Response) (*PatchExportNameS
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetGroupsResponse parses an HTTP response from a GetGroupsWithResponse call
-func ParseGetGroupsResponse(rsp *http.Response) (*GetGroupsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetGroupsResponse(rsp *http.Response) (result *GetGroupsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14715,6 +24085,7 @@ func ParseGetGroupsResponse(rsp *http.Response) (*GetGroupsResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14745,14 +24116,26 @@ func ParseGetGroupsResponse(rsp *http.Response) (*GetGroupsResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostGroupsResponse parses an HTTP response from a PostGroupsWithResponse call
-func ParsePostGroupsResponse(rsp *http.Response) (*PostGroupsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostGroupsResponse(rsp *http.Response) (result *PostGroupsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14762,6 +24145,7 @@ func ParsePostGroupsResponse(rsp *http.Response) (*PostGroupsResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14820,14 +24204,26 @@ func ParsePostGroupsResponse(rsp *http.Response) (*PostGroupsResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeleteGroupsNameResponse parses an HTTP response from a DeleteGroupsNameWithResponse call
-func ParseDeleteGroupsNameResponse(rsp *http.Response) (*DeleteGroupsNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeleteGroupsNameResponse(rsp *http.Response) (result *DeleteGroupsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14837,6 +24233,7 @@ func ParseDeleteGroupsNameResponse(rsp *http.Response) (*DeleteGroupsNameRespons
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case rsp.StatusCode == 204:
@@ -14891,14 +24288,26 @@ func ParseDeleteGroupsNameResponse(rsp *http.Response) (*DeleteGroupsNameRespons
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetGroupsNameResponse parses an HTTP response from a GetGroupsNameWithResponse call
-func ParseGetGroupsNameResponse(rsp *http.Response) (*GetGroupsNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetGroupsNameResponse(rsp *http.Response) (result *GetGroupsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14908,6 +24317,7 @@ func ParseGetGroupsNameResponse(rsp *http.Response) (*GetGroupsNameResponse, err
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -14945,14 +24355,26 @@ func ParseGetGroupsNameResponse(rsp *http.Response) (*GetGroupsNameResponse, err
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePatchGroupsNameResponse parses an HTTP response from a PatchGroupsNameWithResponse call
-func ParsePatchGroupsNameResponse(rsp *http.Response) (*PatchGroupsNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePatchGroupsNameResponse(rsp *http.Response) (result *PatchGroupsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -14962,6 +24384,7 @@ func ParsePatchGroupsNameResponse(rsp *http.Response) (*PatchGroupsNameResponse,
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15020,14 +24443,26 @@ func ParsePatchGroupsNameResponse(rsp *http.Response) (*PatchGroupsNameResponse,
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePutGroupsNameResponse parses an HTTP response from a PutGroupsNameWithResponse call
-func ParsePutGroupsNameResponse(rsp *http.Response) (*PutGroupsNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePutGroupsNameResponse(rsp *http.Response) (result *PutGroupsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15037,6 +24472,7 @@ func ParsePutGroupsNameResponse(rsp *http.Response) (*PutGroupsNameResponse, err
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15095,14 +24531,26 @@ func ParsePutGroupsNameResponse(rsp *http.Response) (*PutGroupsNameResponse, err
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetGroupsNameUsageResponse parses an HTTP response from a GetGroupsNameUsageWithResponse call
-func ParseGetGroupsNameUsageResponse(rsp *http.Response) (*GetGroupsNameUsageResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetGroupsNameUsageResponse(rsp *http.Response) (result *GetGroupsNameUsageResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15112,6 +24560,7 @@ func ParseGetGroupsNameUsageResponse(rsp *http.Response) (*GetGroupsNameUsageRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15142,6 +24591,13 @@ func ParseGetGroupsNameUsageResponse(rsp *http.Response) (*GetGroupsNameUsageRes
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -15149,14 +24605,26 @@ func ParseGetGroupsNameUsageResponse(rsp *http.Response) (*GetGroupsNameUsageRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetHooksResponse parses an HTTP response from a GetHooksWithResponse call
-func ParseGetHooksResponse(rsp *http.Response) (*GetHooksResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetHooksResponse(rsp *http.Response) (result *GetHooksResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15166,6 +24634,7 @@ func ParseGetHooksResponse(rsp *http.Response) (*GetHooksResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15196,14 +24665,26 @@ func ParseGetHooksResponse(rsp *http.Response) (*GetHooksResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostHooksResponse parses an HTTP response from a PostHooksWithResponse call
-func ParsePostHooksResponse(rsp *http.Response) (*PostHooksResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostHooksResponse(rsp *http.Response) (result *PostHooksResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15213,6 +24694,7 @@ func ParsePostHooksResponse(rsp *http.Response) (*PostHooksResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15271,14 +24753,26 @@ func ParsePostHooksResponse(rsp *http.Response) (*PostHooksResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeleteHooksNameResponse parses an HTTP response from a DeleteHooksNameWithResponse call
-func ParseDeleteHooksNameResponse(rsp *http.Response) (*DeleteHooksNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeleteHooksNameResponse(rsp *http.Response) (result *DeleteHooksNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15288,6 +24782,7 @@ func ParseDeleteHooksNameResponse(rsp *http.Response) (*DeleteHooksNameResponse,
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case rsp.StatusCode == 204:
@@ -15342,14 +24837,26 @@ func ParseDeleteHooksNameResponse(rsp *http.Response) (*DeleteHooksNameResponse,
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetHooksNameResponse parses an HTTP response from a GetHooksNameWithResponse call
-func ParseGetHooksNameResponse(rsp *http.Response) (*GetHooksNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetHooksNameResponse(rsp *http.Response) (result *GetHooksNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15359,6 +24866,7 @@ func ParseGetHooksNameResponse(rsp *http.Response) (*GetHooksNameResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15396,14 +24904,26 @@ func ParseGetHooksNameResponse(rsp *http.Response) (*GetHooksNameResponse, error
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePutHooksNameResponse parses an HTTP response from a PutHooksNameWithResponse call
-func ParsePutHooksNameResponse(rsp *http.Response) (*PutHooksNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePutHooksNameResponse(rsp *http.Response) (result *PutHooksNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15413,6 +24933,7 @@ func ParsePutHooksNameResponse(rsp *http.Response) (*PutHooksNameResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15471,14 +24992,26 @@ func ParsePutHooksNameResponse(rsp *http.Response) (*PutHooksNameResponse, error
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetHooksNameHealthResponse parses an HTTP response from a GetHooksNameHealthWithResponse call
-func ParseGetHooksNameHealthResponse(rsp *http.Response) (*GetHooksNameHealthResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetHooksNameHealthResponse(rsp *http.Response) (result *GetHooksNameHealthResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15488,6 +25021,7 @@ func ParseGetHooksNameHealthResponse(rsp *http.Response) (*GetHooksNameHealthRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15525,14 +25059,26 @@ func ParseGetHooksNameHealthResponse(rsp *http.Response) (*GetHooksNameHealthRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetHooksNameSchemaResponse parses an HTTP response from a GetHooksNameSchemaWithResponse call
-func ParseGetHooksNameSchemaResponse(rsp *http.Response) (*GetHooksNameSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetHooksNameSchemaResponse(rsp *http.Response) (result *GetHooksNameSchemaResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15542,6 +25088,7 @@ func ParseGetHooksNameSchemaResponse(rsp *http.Response) (*GetHooksNameSchemaRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15579,14 +25126,26 @@ func ParseGetHooksNameSchemaResponse(rsp *http.Response) (*GetHooksNameSchemaRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePatchHooksNameSettingsResponse parses an HTTP response from a PatchHooksNameSettingsWithResponse call
-func ParsePatchHooksNameSettingsResponse(rsp *http.Response) (*PatchHooksNameSettingsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePatchHooksNameSettingsResponse(rsp *http.Response) (result *PatchHooksNameSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15596,6 +25155,7 @@ func ParsePatchHooksNameSettingsResponse(rsp *http.Response) (*PatchHooksNameSet
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15654,14 +25214,26 @@ func ParsePatchHooksNameSettingsResponse(rsp *http.Response) (*PatchHooksNameSet
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetHooksNameStatusResponse parses an HTTP response from a GetHooksNameStatusWithResponse call
-func ParseGetHooksNameStatusResponse(rsp *http.Response) (*GetHooksNameStatusResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetHooksNameStatusResponse(rsp *http.Response) (result *GetHooksNameStatusResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15671,6 +25243,7 @@ func ParseGetHooksNameStatusResponse(rsp *http.Response) (*GetHooksNameStatusRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15708,14 +25281,26 @@ func ParseGetHooksNameStatusResponse(rsp *http.Response) (*GetHooksNameStatusRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetIdentityProvidersResponse parses an HTTP response from a GetIdentityProvidersWithResponse call
-func ParseGetIdentityProvidersResponse(rsp *http.Response) (*GetIdentityProvidersResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetIdentityProvidersResponse(rsp *http.Response) (result *GetIdentityProvidersResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15725,6 +25310,7 @@ func ParseGetIdentityProvidersResponse(rsp *http.Response) (*GetIdentityProvider
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15755,14 +25341,26 @@ func ParseGetIdentityProvidersResponse(rsp *http.Response) (*GetIdentityProvider
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeleteIdentityProvidersNameResponse parses an HTTP response from a DeleteIdentityProvidersNameWithResponse call
-func ParseDeleteIdentityProvidersNameResponse(rsp *http.Response) (*DeleteIdentityProvidersNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeleteIdentityProvidersNameResponse(rsp *http.Response) (result *DeleteIdentityProvidersNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15772,6 +25370,7 @@ func ParseDeleteIdentityProvidersNameResponse(rsp *http.Response) (*DeleteIdenti
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case rsp.StatusCode == 204:
@@ -15826,14 +25425,26 @@ func ParseDeleteIdentityProvidersNameResponse(rsp *http.Response) (*DeleteIdenti
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetIdentityProvidersNameResponse parses an HTTP response from a GetIdentityProvidersNameWithResponse call
-func ParseGetIdentityProvidersNameResponse(rsp *http.Response) (*GetIdentityProvidersNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetIdentityProvidersNameResponse(rsp *http.Response) (result *GetIdentityProvidersNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15843,6 +25454,7 @@ func ParseGetIdentityProvidersNameResponse(rsp *http.Response) (*GetIdentityProv
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15880,14 +25492,26 @@ func ParseGetIdentityProvidersNameResponse(rsp *http.Response) (*GetIdentityProv
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePutIdentityProvidersNameResponse parses an HTTP response from a PutIdentityProvidersNameWithResponse call
-func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (*PutIdentityProvidersNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (result *PutIdentityProvidersNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15897,6 +25521,7 @@ func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (*PutIdentityProv
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -15948,14 +25573,26 @@ func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (*PutIdentityProv
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePatchIdentityProvidersNameSettingsResponse parses an HTTP response from a PatchIdentityProvidersNameSettingsWithResponse call
-func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (*PatchIdentityProvidersNameSettingsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (result *PatchIdentityProvidersNameSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -15965,6 +25602,7 @@ func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (*Patch
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16023,14 +25661,26 @@ func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (*Patch
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetInfoResponse parses an HTTP response from a GetInfoWithResponse call
-func ParseGetInfoResponse(rsp *http.Response) (*GetInfoResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetInfoResponse(rsp *http.Response) (result *GetInfoResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16040,6 +25690,7 @@ func ParseGetInfoResponse(rsp *http.Response) (*GetInfoResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16070,14 +25721,26 @@ func ParseGetInfoResponse(rsp *http.Response) (*GetInfoResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetKeysResponse parses an HTTP response from a GetKeysWithResponse call
-func ParseGetKeysResponse(rsp *http.Response) (*GetKeysResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetKeysResponse(rsp *http.Response) (result *GetKeysResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16087,6 +25750,7 @@ func ParseGetKeysResponse(rsp *http.Response) (*GetKeysResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16124,14 +25788,26 @@ func ParseGetKeysResponse(rsp *http.Response) (*GetKeysResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostKeysResponse parses an HTTP response from a PostKeysWithResponse call
-func ParsePostKeysResponse(rsp *http.Response) (*PostKeysResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostKeysResponse(rsp *http.Response) (result *PostKeysResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16141,6 +25817,7 @@ func ParsePostKeysResponse(rsp *http.Response) (*PostKeysResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
@@ -16192,14 +25869,26 @@ func ParsePostKeysResponse(rsp *http.Response) (*PostKeysResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeleteKeysIdResponse parses an HTTP response from a DeleteKeysIdWithResponse call
-func ParseDeleteKeysIdResponse(rsp *http.Response) (*DeleteKeysIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeleteKeysIdResponse(rsp *http.Response) (result *DeleteKeysIdResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16209,6 +25898,7 @@ func ParseDeleteKeysIdResponse(rsp *http.Response) (*DeleteKeysIdResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case rsp.StatusCode == 204:
@@ -16263,14 +25953,26 @@ func ParseDeleteKeysIdResponse(rsp *http.Response) (*DeleteKeysIdResponse, error
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetKeysIdResponse parses an HTTP response from a GetKeysIdWithResponse call
-func ParseGetKeysIdResponse(rsp *http.Response) (*GetKeysIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetKeysIdResponse(rsp *http.Response) (result *GetKeysIdResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16280,6 +25982,7 @@ func ParseGetKeysIdResponse(rsp *http.Response) (*GetKeysIdResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16324,14 +26027,26 @@ func ParseGetKeysIdResponse(rsp *http.Response) (*GetKeysIdResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePatchKeysIdResponse parses an HTTP response from a PatchKeysIdWithResponse call
-func ParsePatchKeysIdResponse(rsp *http.Response) (*PatchKeysIdResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePatchKeysIdResponse(rsp *http.Response) (result *PatchKeysIdResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16341,6 +26056,7 @@ func ParsePatchKeysIdResponse(rsp *http.Response) (*PatchKeysIdResponse, error) 
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16399,14 +26115,26 @@ func ParsePatchKeysIdResponse(rsp *http.Response) (*PatchKeysIdResponse, error) 
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostKeysIdRevokeResponse parses an HTTP response from a PostKeysIdRevokeWithResponse call
-func ParsePostKeysIdRevokeResponse(rsp *http.Response) (*PostKeysIdRevokeResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostKeysIdRevokeResponse(rsp *http.Response) (result *PostKeysIdRevokeResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16416,6 +26144,7 @@ func ParsePostKeysIdRevokeResponse(rsp *http.Response) (*PostKeysIdRevokeRespons
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16474,14 +26203,26 @@ func ParsePostKeysIdRevokeResponse(rsp *http.Response) (*PostKeysIdRevokeRespons
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostKeysIdRotateResponse parses an HTTP response from a PostKeysIdRotateWithResponse call
-func ParsePostKeysIdRotateResponse(rsp *http.Response) (*PostKeysIdRotateResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostKeysIdRotateResponse(rsp *http.Response) (result *PostKeysIdRotateResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16491,6 +26232,7 @@ func ParsePostKeysIdRotateResponse(rsp *http.Response) (*PostKeysIdRotateRespons
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16499,6 +26241,13 @@ func ParsePostKeysIdRotateResponse(rsp *http.Response) (*PostKeysIdRotateRespons
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
@@ -16542,14 +26291,26 @@ func ParsePostKeysIdRotateResponse(rsp *http.Response) (*PostKeysIdRotateRespons
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetKeysIdUsageResponse parses an HTTP response from a GetKeysIdUsageWithResponse call
-func ParseGetKeysIdUsageResponse(rsp *http.Response) (*GetKeysIdUsageResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetKeysIdUsageResponse(rsp *http.Response) (result *GetKeysIdUsageResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16559,6 +26320,7 @@ func ParseGetKeysIdUsageResponse(rsp *http.Response) (*GetKeysIdUsageResponse, e
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16596,6 +26358,13 @@ func ParseGetKeysIdUsageResponse(rsp *http.Response) (*GetKeysIdUsageResponse, e
 		}
 		response.JSON404 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -16603,14 +26372,450 @@ func ParseGetKeysIdUsageResponse(rsp *http.Response) (*GetKeysIdUsageResponse, e
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostLedgerAmendRateHistoryResponse parses an HTTP response from a PostLedgerAmendRateHistoryWithResponse call
+func ParsePostLedgerAmendRateHistoryResponse(rsp *http.Response) (result *PostLedgerAmendRateHistoryResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostLedgerAmendRateHistoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AmendRateHistoryView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerCheckpointsResponse parses an HTTP response from a GetLedgerCheckpointsWithResponse call
+func ParseGetLedgerCheckpointsResponse(rsp *http.Response) (result *GetLedgerCheckpointsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerCheckpointsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LedgerCheckpoints
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerMigrationResponse parses an HTTP response from a GetLedgerMigrationWithResponse call
+func ParseGetLedgerMigrationResponse(rsp *http.Response) (result *GetLedgerMigrationResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerMigrationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LedgerMigration
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerOpenapiJsonResponse parses an HTTP response from a GetLedgerOpenapiJsonWithResponse call
+func ParseGetLedgerOpenapiJsonResponse(rsp *http.Response) (result *GetLedgerOpenapiJsonResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerOpenapiJsonResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest map[string]interface{}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerReconciliationResponse parses an HTTP response from a GetLedgerReconciliationWithResponse call
+func ParseGetLedgerReconciliationResponse(rsp *http.Response) (result *GetLedgerReconciliationResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerReconciliationResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LedgerReconciliation
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostLedgerRecoveryListResponse parses an HTTP response from a PostLedgerRecoveryListWithResponse call
+func ParsePostLedgerRecoveryListResponse(rsp *http.Response) (result *PostLedgerRecoveryListResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostLedgerRecoveryListResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ListView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostLedgerRecoveryResolveResponse parses an HTTP response from a PostLedgerRecoveryResolveWithResponse call
+func ParsePostLedgerRecoveryResolveResponse(rsp *http.Response) (result *PostLedgerRecoveryResolveResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostLedgerRecoveryResolveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ItemView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetLedgerTotalsResponse parses an HTTP response from a GetLedgerTotalsWithResponse call
+func ParseGetLedgerTotalsResponse(rsp *http.Response) (result *GetLedgerTotalsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetLedgerTotalsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest LedgerTotals
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetModelsResponse parses an HTTP response from a GetModelsWithResponse call
-func ParseGetModelsResponse(rsp *http.Response) (*GetModelsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetModelsResponse(rsp *http.Response) (result *GetModelsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16620,6 +26825,7 @@ func ParseGetModelsResponse(rsp *http.Response) (*GetModelsResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16650,14 +26856,26 @@ func ParseGetModelsResponse(rsp *http.Response) (*GetModelsResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetOpenapiJsonResponse parses an HTTP response from a GetOpenapiJsonWithResponse call
-func ParseGetOpenapiJsonResponse(rsp *http.Response) (*GetOpenapiJsonResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetOpenapiJsonResponse(rsp *http.Response) (result *GetOpenapiJsonResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16667,6 +26885,7 @@ func ParseGetOpenapiJsonResponse(rsp *http.Response) (*GetOpenapiJsonResponse, e
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16697,14 +26916,26 @@ func ParseGetOpenapiJsonResponse(rsp *http.Response) (*GetOpenapiJsonResponse, e
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeleteOverlaySectionResponse parses an HTTP response from a DeleteOverlaySectionWithResponse call
-func ParseDeleteOverlaySectionResponse(rsp *http.Response) (*DeleteOverlaySectionResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeleteOverlaySectionResponse(rsp *http.Response) (result *DeleteOverlaySectionResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16714,6 +26945,7 @@ func ParseDeleteOverlaySectionResponse(rsp *http.Response) (*DeleteOverlaySectio
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16765,14 +26997,160 @@ func ParseDeleteOverlaySectionResponse(rsp *http.Response) (*DeleteOverlaySectio
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPlaneFactsResponse parses an HTTP response from a GetPlaneFactsWithResponse call
+func ParseGetPlaneFactsResponse(rsp *http.Response) (result *GetPlaneFactsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPlaneFactsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PlaneFactsView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostPlaneRecordWriteResponse parses an HTTP response from a PostPlaneRecordWriteWithResponse call
+func ParsePostPlaneRecordWriteResponse(rsp *http.Response) (result *PostPlaneRecordWriteResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostPlaneRecordWriteResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PlaneRecordWriteView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetPluginsResponse parses an HTTP response from a GetPluginsWithResponse call
-func ParseGetPluginsResponse(rsp *http.Response) (*GetPluginsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetPluginsResponse(rsp *http.Response) (result *GetPluginsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16782,6 +27160,7 @@ func ParseGetPluginsResponse(rsp *http.Response) (*GetPluginsResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16819,14 +27198,26 @@ func ParseGetPluginsResponse(rsp *http.Response) (*GetPluginsResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostPluginsResponse parses an HTTP response from a PostPluginsWithResponse call
-func ParsePostPluginsResponse(rsp *http.Response) (*PostPluginsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostPluginsResponse(rsp *http.Response) (result *PostPluginsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16836,6 +27227,7 @@ func ParsePostPluginsResponse(rsp *http.Response) (*PostPluginsResponse, error) 
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
@@ -16887,14 +27279,26 @@ func ParsePostPluginsResponse(rsp *http.Response) (*PostPluginsResponse, error) 
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostPluginsInspectResponse parses an HTTP response from a PostPluginsInspectWithResponse call
-func ParsePostPluginsInspectResponse(rsp *http.Response) (*PostPluginsInspectResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostPluginsInspectResponse(rsp *http.Response) (result *PostPluginsInspectResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16904,6 +27308,7 @@ func ParsePostPluginsInspectResponse(rsp *http.Response) (*PostPluginsInspectRes
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -16948,14 +27353,26 @@ func ParsePostPluginsInspectResponse(rsp *http.Response) (*PostPluginsInspectRes
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostPluginsReloadResponse parses an HTTP response from a PostPluginsReloadWithResponse call
-func ParsePostPluginsReloadResponse(rsp *http.Response) (*PostPluginsReloadResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostPluginsReloadResponse(rsp *http.Response) (result *PostPluginsReloadResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -16965,6 +27382,7 @@ func ParsePostPluginsReloadResponse(rsp *http.Response) (*PostPluginsReloadRespo
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17009,14 +27427,26 @@ func ParsePostPluginsReloadResponse(rsp *http.Response) (*PostPluginsReloadRespo
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostPluginsRollbackResponse parses an HTTP response from a PostPluginsRollbackWithResponse call
-func ParsePostPluginsRollbackResponse(rsp *http.Response) (*PostPluginsRollbackResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostPluginsRollbackResponse(rsp *http.Response) (result *PostPluginsRollbackResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17026,6 +27456,7 @@ func ParsePostPluginsRollbackResponse(rsp *http.Response) (*PostPluginsRollbackR
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17084,14 +27515,26 @@ func ParsePostPluginsRollbackResponse(rsp *http.Response) (*PostPluginsRollbackR
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseDeletePluginsFileResponse parses an HTTP response from a DeletePluginsFileWithResponse call
-func ParseDeletePluginsFileResponse(rsp *http.Response) (*DeletePluginsFileResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseDeletePluginsFileResponse(rsp *http.Response) (result *DeletePluginsFileResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17101,6 +27544,7 @@ func ParseDeletePluginsFileResponse(rsp *http.Response) (*DeletePluginsFileRespo
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case rsp.StatusCode == 204:
@@ -17148,14 +27592,26 @@ func ParseDeletePluginsFileResponse(rsp *http.Response) (*DeletePluginsFileRespo
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetPluginsFileSchemaResponse parses an HTTP response from a GetPluginsFileSchemaWithResponse call
-func ParseGetPluginsFileSchemaResponse(rsp *http.Response) (*GetPluginsFileSchemaResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetPluginsFileSchemaResponse(rsp *http.Response) (result *GetPluginsFileSchemaResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17165,6 +27621,7 @@ func ParseGetPluginsFileSchemaResponse(rsp *http.Response) (*GetPluginsFileSchem
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17202,14 +27659,26 @@ func ParseGetPluginsFileSchemaResponse(rsp *http.Response) (*GetPluginsFileSchem
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetPoolsResponse parses an HTTP response from a GetPoolsWithResponse call
-func ParseGetPoolsResponse(rsp *http.Response) (*GetPoolsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetPoolsResponse(rsp *http.Response) (result *GetPoolsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17219,6 +27688,7 @@ func ParseGetPoolsResponse(rsp *http.Response) (*GetPoolsResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17256,14 +27726,26 @@ func ParseGetPoolsResponse(rsp *http.Response) (*GetPoolsResponse, error) {
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetPoolsNameResponse parses an HTTP response from a GetPoolsNameWithResponse call
-func ParseGetPoolsNameResponse(rsp *http.Response) (*GetPoolsNameResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetPoolsNameResponse(rsp *http.Response) (result *GetPoolsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17273,6 +27755,7 @@ func ParseGetPoolsNameResponse(rsp *http.Response) (*GetPoolsNameResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17310,14 +27793,26 @@ func ParseGetPoolsNameResponse(rsp *http.Response) (*GetPoolsNameResponse, error
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetProvidersResponse parses an HTTP response from a GetProvidersWithResponse call
-func ParseGetProvidersResponse(rsp *http.Response) (*GetProvidersResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetProvidersResponse(rsp *http.Response) (result *GetProvidersResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17327,6 +27822,7 @@ func ParseGetProvidersResponse(rsp *http.Response) (*GetProvidersResponse, error
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17357,14 +27853,26 @@ func ParseGetProvidersResponse(rsp *http.Response) (*GetProvidersResponse, error
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostRestartResponse parses an HTTP response from a PostRestartWithResponse call
-func ParsePostRestartResponse(rsp *http.Response) (*PostRestartResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostRestartResponse(rsp *http.Response) (result *PostRestartResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17374,6 +27882,7 @@ func ParsePostRestartResponse(rsp *http.Response) (*PostRestartResponse, error) 
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
@@ -17425,14 +27934,26 @@ func ParsePostRestartResponse(rsp *http.Response) (*PostRestartResponse, error) 
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParsePostSigningKeyRotateResponse parses an HTTP response from a PostSigningKeyRotateWithResponse call
-func ParsePostSigningKeyRotateResponse(rsp *http.Response) (*PostSigningKeyRotateResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParsePostSigningKeyRotateResponse(rsp *http.Response) (result *PostSigningKeyRotateResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17442,6 +27963,7 @@ func ParsePostSigningKeyRotateResponse(rsp *http.Response) (*PostSigningKeyRotat
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17486,14 +28008,815 @@ func ParsePostSigningKeyRotateResponse(rsp *http.Response) (*PostSigningKeyRotat
 		}
 		response.JSON500 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostStoreRestoreResponse parses an HTTP response from a PostStoreRestoreWithResponse call
+func ParsePostStoreRestoreResponse(rsp *http.Response) (result *PostStoreRestoreResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostStoreRestoreResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsResponse parses an HTTP response from a GetToolsWithResponse call
+func ParseGetToolsResponse(rsp *http.Response) (result *GetToolsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PageNamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteToolsNameResponse parses an HTTP response from a DeleteToolsNameWithResponse call
+func ParseDeleteToolsNameResponse(rsp *http.Response) (result *DeleteToolsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteToolsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsNameResponse parses an HTTP response from a GetToolsNameWithResponse call
+func ParseGetToolsNameResponse(rsp *http.Response) (result *GetToolsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutToolsNameResponse parses an HTTP response from a PutToolsNameWithResponse call
+func ParsePutToolsNameResponse(rsp *http.Response) (result *PutToolsNameResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutToolsNameResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsNameChangesResponse parses an HTTP response from a GetToolsNameChangesWithResponse call
+func ParseGetToolsNameChangesResponse(rsp *http.Response) (result *GetToolsNameChangesResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsNameChangesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest McpTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostToolsNameConnectResponse parses an HTTP response from a PostToolsNameConnectWithResponse call
+func ParsePostToolsNameConnectResponse(rsp *http.Response) (result *PostToolsNameConnectResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostToolsNameConnectResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest McpTrustView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetToolsNameHealthResponse parses an HTTP response from a GetToolsNameHealthWithResponse call
+func ParseGetToolsNameHealthResponse(rsp *http.Response) (result *GetToolsNameHealthResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetToolsNameHealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest McpHealthView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePatchToolsNameSettingsResponse parses an HTTP response from a PatchToolsNameSettingsWithResponse call
+func ParsePatchToolsNameSettingsResponse(rsp *http.Response) (result *PatchToolsNameSettingsResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PatchToolsNameSettingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest NamedDefView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 429:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON429 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTrustResponse parses an HTTP response from a GetTrustWithResponse call
+func ParseGetTrustResponse(rsp *http.Response) (result *GetTrustResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTrustResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrustListView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostTrustApproveResponse parses an HTTP response from a PostTrustApproveWithResponse call
+func ParsePostTrustApproveResponse(rsp *http.Response) (result *PostTrustApproveResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostTrustApproveResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrustKeyView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePostTrustRevokeResponse parses an HTTP response from a PostTrustRevokeWithResponse call
+func ParsePostTrustRevokeResponse(rsp *http.Response) (result *PostTrustRevokeResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PostTrustRevokeResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TrustKeyView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
 	}
 
 	return response, nil
 }
 
 // ParseGetUsageResponse parses an HTTP response from a GetUsageWithResponse call
-func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
+func ParseGetUsageResponse(rsp *http.Response) (result *GetUsageResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
@@ -17503,6 +28826,7 @@ func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
+	rsp = responseForJSONParsing(rsp)
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
@@ -17533,12 +28857,72 @@ func ParseGetUsageResponse(rsp *http.Response) (*GetUsageResponse, error) {
 		}
 		response.JSON403 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 409:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON409 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetVerifyResponse parses an HTTP response from a GetVerifyWithResponse call
+func ParseGetVerifyResponse(rsp *http.Response) (result *GetVerifyResponse, err error) {
+	defer func(original *http.Response) {
+		if err != nil {
+			err = &ResponseParseError{HTTPResponse: original, Err: err}
+		}
+	}(rsp)
+	bodyBytes, err := readResponseBody(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetVerifyResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+	rsp = responseForJSONParsing(rsp)
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest VerifyView
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

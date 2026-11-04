@@ -4,3 +4,8 @@ output: client.gen.go
 generate:
   models: true
   client: true
+output-options:
+  user-templates:
+    client.tmpl: templates/client.tmpl
+    client-with-responses.tmpl: templates/client-with-responses.tmpl
+    typedef.tmpl: templates/typedef.tmpl

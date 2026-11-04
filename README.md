@@ -21,7 +21,7 @@ import busbar "github.com/GetBusbar/busbar-go"
   written down here on purpose: a Go module's version is a git tag, with no in-repo
   manifest to check a README claim against, so a hardcoded one would only ever be as
   fresh as the last person who remembered to edit it.
-- **Generated from:** busbar OpenAPI `info.version` `1.5.4`, the bundled
+- **Generated from:** busbar OpenAPI `info.version` `1.6.0`, the bundled
   [`openapi.json`](./openapi.json).
 
 It targets the frozen, additive-only `/api/v1/admin` surface. `dev` is kept
@@ -83,7 +83,7 @@ func main() {
 
 	// resp.JSON200 is *InfoView — TYPED. .Version is string, .Topology is a struct.
 	info := resp.JSON200
-	fmt.Println("busbar version:", info.Version)        // -> "1.5.4"
+	fmt.Println("busbar version:", info.Version)        // -> "1.6.0"
 	fmt.Println("pools:", info.Topology.Pools)
 	fmt.Println("config version:", info.ConfigVersion)
 }
@@ -91,6 +91,30 @@ func main() {
 
 > Prefer `Authorization: Bearer`? Set `req.Header.Set("Authorization", "Bearer YOUR_ADMIN_TOKEN")`
 > instead — the admin API accepts either.
+
+## Request and response safeguards
+
+The default HTTP client follows redirects only within the original origin
+(scheme, host, and port), keeping `x-admin-token` out of cross-origin requests.
+A client supplied with `WithHTTPClient` owns its own redirect and timeout policy.
+Use a context deadline for each operation.
+
+Typed `WithResponse` calls and standalone response parsers buffer at most
+`MaxResponseBodyBytes` (64 MiB) and return an error above that limit. For larger
+responses, use the raw client methods and stream and close the response body.
+`ResponseParseError` retains the HTTP response metadata on read or decode
+failures and unwraps the original error for `errors.Is` and `errors.As`.
+
+To unbind a key's group, pass `UpdateKeyReq{GroupNull: true}`. Leaving both
+`Group` and `GroupNull` unset preserves the existing binding; a non-nil `Group`
+rebinds it. Setting both returns a JSON encoding error.
+
+### Differences from 1.5.5 <!-- version-check: ignore -->
+
+Admin-token authentication and key-group unbinding already existed in that
+server release. This SDK now stops cross-origin redirects and bounds buffered
+responses to protect credentials and memory. Explicit null group patches are
+preserved; ordinary valid API requests retain their behavior.
 
 ## Regenerating the client
 
@@ -101,7 +125,9 @@ re-derive it:
 make generate     # runs the pinned oapi-codegen via go run
 ```
 
-The generator version is pinned in `go.mod` (via `tools.go`). CI regenerates on
+The generator version is pinned in `go.mod` (via `tools.go`). Local templates in
+`templates/`, based on that pinned generator, preserve the SDK safeguards and
+the three-state key-group patch when regenerating. CI regenerates on
 every PR/push and fails if the committed client drifts (`git diff --exit-code`).
 
 `dev` is additionally kept auto-synced with busbarAI's `dev` branch spec by

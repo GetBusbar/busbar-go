@@ -1,0 +1,14 @@
+{{range .Types}}
+{{if eq .TypeName "UpdateKeyReq"}}{{ .DocComment }}
+type UpdateKeyReq struct {
+{{range .Schema.Properties}}
+{{if .Description}}{{toGoComment .Description .GoFieldName}}
+{{end}}{{.GoFieldName}} {{.GoTypeDef}} `json:"{{.JsonFieldName}}{{if not .Required}},omitempty{{end}}"`
+{{end}}
+ // GroupNull sends an explicit JSON null for group. It must not be combined with Group.
+ GroupNull bool `json:"-"`
+}
+{{else}}{{ .DocComment }}
+type {{.TypeName}} {{if .IsAlias }}={{end}} {{.Schema.TypeDecl}}
+{{end}}
+{{end}}
