@@ -72,11 +72,11 @@ jobs:
             workflow_dispatch)   tag="${INPUT_TAG:-}" ;;
           esac
           if [ -z "$tag" ]; then
-            tag="$(gh api repos/GetBusbar/busbar/releases/latest --jq .tag_name 2>/dev/null || true)"
+            tag="$(gh api repos/GetBusbar/busbar/releases/latest --jq .tag_name)"
           fi
           if [ -z "$tag" ]; then
-            echo "::notice::could not resolve a core release tag -> nothing to do"
-            echo "proceed=no" >> "$GITHUB_OUTPUT"; exit 0
+            echo "::error::core release API returned no tag"
+            exit 1
           fi
           ver="${tag#v}"
           echo "target core tag: $tag (spec version $ver)"
@@ -111,13 +111,15 @@ jobs:
           ops_new="$(ops openapi.json)"
 
           make generate
+          python3 .github/update-readme-version.py
+          python3 .github/check-readme-versions.py
           make verify # build + vet — never tag a commit that does not build
 
           if git diff --quiet -- client.gen.go; then
-            if git diff --quiet -- openapi.json; then
+            if git diff --quiet -- openapi.json README.md; then
               echo "::notice::spec + client identical -> idempotent no-op"
             else
-              git add openapi.json
+              git add openapi.json README.md
               git commit -m "spec: refresh openapi.json to busbar ${CORE_TAG} (generated client unchanged)"
               git push origin HEAD:main
               echo "::notice::spec refreshed to ${CORE_TAG}; client unchanged, no tag cut"
@@ -137,7 +139,7 @@ jobs:
             echo "::notice::${next} already exists -> idempotent no-op"; exit 0
           fi
 
-          git add openapi.json client.gen.go
+          git add openapi.json client.gen.go README.md
           git commit -m "release: ${next} — regenerate against busbar ${CORE_TAG} spec"
           git push origin HEAD:main
           git tag "$next"

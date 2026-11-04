@@ -87,9 +87,11 @@ jobs:
           cp /tmp/upstream-openapi.json openapi.json
 
           make generate
+          python3 .github/update-readme-version.py
+          python3 .github/check-readme-versions.py
           make verify
 
-          if git diff --quiet -- openapi.json client.gen.go; then
+          if git diff --quiet -- openapi.json client.gen.go README.md; then
             echo "::notice::regeneration produced no diff after all (spec content-equal); nothing to commit"
             exit 0
           fi
@@ -98,7 +100,7 @@ jobs:
 
           git config user.name  "regen-from-upstream"
           git config user.email "actions@users.noreply.github.com"
-          git add openapi.json client.gen.go
+          git add openapi.json client.gen.go README.md
           git commit -m "sync: regenerate from busbarAI dev @ ${UPSTREAM_SHORT}
 
           Upstream openapi.json (busbar dev, spec version ${new_version}) changed at
