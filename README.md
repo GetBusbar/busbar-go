@@ -5,9 +5,9 @@
 A typed Go client for the **Busbar Admin API** (`/api/v1/admin`).
 
 Generated from the typed OpenAPI 3.1 schema in [`openapi.json`](./openapi.json)
-with [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) v2, so every
-response is a real struct (`InfoView`, `TopologyInfo`, ...) — not
-`interface{}`/`json.RawMessage`.
+with [`oapi-codegen`](https://github.com/oapi-codegen/oapi-codegen) v2, including
+typed response models such as `InfoView` and `TopologyInfo`. Open configuration
+values and response unions retain their schema-defined shapes.
 
 ```
 import busbar "github.com/GetBusbar/busbar-go"
@@ -109,6 +109,20 @@ To unbind a key's group, pass `UpdateKeyReq{GroupNull: true}`. Leaving both
 `Group` and `GroupNull` unset preserves the existing binding; a non-nil `Group`
 rebinds it. Setting both returns a JSON encoding error.
 
+Count fields use `encoding/json.Number` in Go to preserve their exact decimal
+digits, including fractional counts and values beyond the exact integer range
+of `float64`. The wire representation remains a JSON **number**, never a quoted
+string. Use `count.String()` to inspect or retain that decimal value; converting
+it with `Float64()` can lose precision. Count has six decimal places of scale;
+this representation does not compute prices or change server-supplied money.
+
+`PUT /config/settings` now has a generated request union. Its
+`PutConfigSettingsJSONRequestBody` alias retains the union's JSON methods: use
+`FromPutConfigSettingsJSONBody0` for the existing root-settings body or
+`FromPutConfigSettingsJSONBody1` for document/catalog edits. Existing map-literal
+call sites must construct the corresponding union variant. Legacy request JSON
+is unchanged; both modes also support decoding JSON into the request union.
+
 ### Differences from 1.5.5 <!-- version-check: ignore -->
 
 Admin-token authentication and key-group unbinding already existed in that
@@ -122,13 +136,27 @@ The committed client (`client.gen.go`) is generated from `openapi.json`. To
 re-derive it:
 
 ```bash
-make generate     # runs the pinned oapi-codegen via go run
+make generate     # adapts Count fields, then runs the pinned oapi-codegen
 ```
 
 The generator version is pinned in `go.mod` (via `tools.go`). Local templates in
 `templates/`, based on that pinned generator, preserve the SDK safeguards and
-the three-state key-group patch when regenerating. CI regenerates on
+the three-state key-group patch and config request union JSON methods when
+regenerating. CI regenerates on
 every PR/push and fails if the committed client drifts (`git diff --exit-code`).
+
+`internal/generate` reads the canonical `openapi.json` without modifying it.
+Generation follows `x-busbar-count-scale: 6` and the declared
+`x-busbar-exact-number` profile in a temporary derived schema. Numeric Count
+values use `json.Number`, including the legacy numeric arm of exact adjustments;
+the decimal-string arm remains a string. Annotated 64-bit integers use `uint64`
+or `int64`, including unsigned settings limits. Existing numeric wire forms
+remain numeric, and unannotated numeric fields retain their declared types.
+The committed `openapi.json` is never rewritten by generation.
+Generated union accessors and response parsers also decode generic JSON values
+as `json.Number`, so settings can be decoded, edited and re-encoded without
+rounding large integers or exact decimals. Concrete typed numeric fields keep
+their declared types.
 
 `dev` is additionally kept auto-synced with busbarAI's `dev` branch spec by
 `.github/workflows/regen-from-upstream.yml`, which deliberately never touches

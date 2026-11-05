@@ -1,0 +1,16 @@
+{{range .}}{{$opid := .OperationId}}
+{{range .Bodies}}
+{{if .IsSupported -}}
+{{$contentType := .ContentType -}}
+{{with .TypeDef $opid}}
+// {{.TypeName}} defines body for {{$opid}} for {{$contentType}} ContentType.
+{{- with .DeprecationComment}}
+//
+{{.}}
+{{- end}}
+{{/* Preserve the config union JSON methods on its request wrapper. */}}
+type {{.TypeName}} {{if or .IsAlias (eq .TypeName "PutConfigSettingsJSONRequestBody")}}={{end}} {{.Schema.TypeDecl}}
+{{end}}
+{{end}}
+{{end}}
+{{end}}

@@ -9,3 +9,4 @@ output-options:
     client.tmpl: templates/client.tmpl
     client-with-responses.tmpl: templates/client-with-responses.tmpl
     typedef.tmpl: templates/typedef.tmpl
+    request-bodies.tmpl: templates/request-bodies.tmpl
