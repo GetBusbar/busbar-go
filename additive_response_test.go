@@ -62,7 +62,7 @@ func TestTelemetryExactStringsAndErrors(t *testing.T) {
 func TestConfigSettingsModesPreserveWireAndResponses(t *testing.T) {
 	cases := []struct{ name, request, response string }{
 		{"legacy", `{"limits":{"request_body_max_bytes":5000123}}`, `{"applied":true,"config_version":8,"settings":{"limits":{"request_body_max_bytes":5000123}},"reload_to_apply":[]}`},
-		{"document", `{"document_patch":{"set":{"/limits/request_body_max_bytes":5000123,"/rate_card/llm/input":0.125,"/tls":null},"remove":["/providers/retired"]},"providers_patch":{"set":{"/example/base_url":"https://api.example.com"}},"reset_document_paths":["/limits"],"reset_providers_paths":["/example"],"persist":true}`, `{"applied":true,"persisted":true,"config_version":9,"configuration":{"config_version":9,"state":"restart_pending","source":"installed_generation","config_locked":false,"values":{"limits":{"request_body_max_bytes":5000123}},"reload_to_apply":["listen"]},"reload_to_apply":["listen"]}`},
+		{"document", `{"document_patch":{"set":{"/limits/request_body_max_bytes":5000123,"/rate_card/llm/input":0.125,"/tls":null},"remove":["/providers/retired"]},"providers_patch":{"set":{"/example/base_url":"https://api.example.com"}},"reset_document_paths":["/limits"],"reset_providers_paths":["/example"]}`, `{"applied":true,"persisted":true,"config_version":9,"configuration":{"config_version":9,"state":"restart_pending","source":"installed_generation","config_locked":false,"values":{"limits":{"request_body_max_bytes":5000123}},"reload_to_apply":["listen"]},"reload_to_apply":["listen"]}`},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

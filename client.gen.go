@@ -16,6 +16,525 @@ import (
 	"github.com/oapi-codegen/runtime"
 )
 
+// Defines values for AdjustViewRetry.
+const (
+	NonretryableWithoutIdempotencyKey AdjustViewRetry = "nonretryable_without_idempotency_key"
+)
+
+// Valid indicates whether the value is a known member of the AdjustViewRetry enum.
+func (e AdjustViewRetry) Valid() bool {
+	switch e {
+	case NonretryableWithoutIdempotencyKey:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionInFlightErrorEffect.
+const (
+	AdjustmentActionInFlightErrorEffectUnknown AdjustmentActionInFlightErrorEffect = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionInFlightErrorEffect enum.
+func (e AdjustmentActionInFlightErrorEffect) Valid() bool {
+	switch e {
+	case AdjustmentActionInFlightErrorEffectUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionInFlightErrorErrorCode.
+const (
+	AdjustmentActionInFlightErrorErrorCodeActionInFlight AdjustmentActionInFlightErrorErrorCode = "action_in_flight"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionInFlightErrorErrorCode enum.
+func (e AdjustmentActionInFlightErrorErrorCode) Valid() bool {
+	switch e {
+	case AdjustmentActionInFlightErrorErrorCodeActionInFlight:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionInFlightErrorRecovery.
+const (
+	AdjustmentActionInFlightErrorRecoveryReconcileLedgerRecovery AdjustmentActionInFlightErrorRecovery = "reconcile_ledger_recovery"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionInFlightErrorRecovery enum.
+func (e AdjustmentActionInFlightErrorRecovery) Valid() bool {
+	switch e {
+	case AdjustmentActionInFlightErrorRecoveryReconcileLedgerRecovery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionViewEffect.
+const (
+	AdjustmentActionViewEffectApplied    AdjustmentActionViewEffect = "applied"
+	AdjustmentActionViewEffectNotApplied AdjustmentActionViewEffect = "not_applied"
+	AdjustmentActionViewEffectUnknown    AdjustmentActionViewEffect = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionViewEffect enum.
+func (e AdjustmentActionViewEffect) Valid() bool {
+	switch e {
+	case AdjustmentActionViewEffectApplied:
+		return true
+	case AdjustmentActionViewEffectNotApplied:
+		return true
+	case AdjustmentActionViewEffectUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionViewOperation.
+const (
+	Adjust AdjustmentActionViewOperation = "adjust"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionViewOperation enum.
+func (e AdjustmentActionViewOperation) Valid() bool {
+	switch e {
+	case Adjust:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionViewRecovery.
+const (
+	AdjustmentActionViewRecoveryReceipt                 AdjustmentActionViewRecovery = "receipt"
+	AdjustmentActionViewRecoveryReconcileLedgerRecovery AdjustmentActionViewRecovery = "reconcile_ledger_recovery"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionViewRecovery enum.
+func (e AdjustmentActionViewRecovery) Valid() bool {
+	switch e {
+	case AdjustmentActionViewRecoveryReceipt:
+		return true
+	case AdjustmentActionViewRecoveryReconcileLedgerRecovery:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for AdjustmentActionViewRetry.
+const (
+	SameActionOnly AdjustmentActionViewRetry = "same_action_only"
+)
+
+// Valid indicates whether the value is a known member of the AdjustmentActionViewRetry enum.
+func (e AdjustmentActionViewRetry) Valid() bool {
+	switch e {
+	case SameActionOnly:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputHookKind.
+const (
+	Gate ConfigInputHookKind = "gate"
+	Tap  ConfigInputHookKind = "tap"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputHookKind enum.
+func (e ConfigInputHookKind) Valid() bool {
+	switch e {
+	case Gate:
+		return true
+	case Tap:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputHookOnEmpty.
+const (
+	First    ConfigInputHookOnEmpty = "first"
+	Reject   ConfigInputHookOnEmpty = "reject"
+	Weighted ConfigInputHookOnEmpty = "weighted"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputHookOnEmpty enum.
+func (e ConfigInputHookOnEmpty) Valid() bool {
+	switch e {
+	case First:
+		return true
+	case Reject:
+		return true
+	case Weighted:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputHookPhase.
+const (
+	Candidate ConfigInputHookPhase = "candidate"
+	Request   ConfigInputHookPhase = "request"
+	Response  ConfigInputHookPhase = "response"
+	Routing   ConfigInputHookPhase = "routing"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputHookPhase enum.
+func (e ConfigInputHookPhase) Valid() bool {
+	switch e {
+	case Candidate:
+		return true
+	case Request:
+		return true
+	case Response:
+		return true
+	case Routing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputHookPrompt.
+const (
+	ConfigInputHookPromptNo ConfigInputHookPrompt = "no"
+	ConfigInputHookPromptRo ConfigInputHookPrompt = "ro"
+	ConfigInputHookPromptRw ConfigInputHookPrompt = "rw"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputHookPrompt enum.
+func (e ConfigInputHookPrompt) Valid() bool {
+	switch e {
+	case ConfigInputHookPromptNo:
+		return true
+	case ConfigInputHookPromptRo:
+		return true
+	case ConfigInputHookPromptRw:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputHookSignals.
+const (
+	CandidateBreakerState ConfigInputHookSignals = "candidate_breaker_state"
+	CandidateErrorRate    ConfigInputHookSignals = "candidate_error_rate"
+	CandidateLatencyP95Ms ConfigInputHookSignals = "candidate_latency_p95_ms"
+	CandidateRouteCost    ConfigInputHookSignals = "candidate_route_cost"
+	RequestMessageCount   ConfigInputHookSignals = "request_message_count"
+	RequestSystemChars    ConfigInputHookSignals = "request_system_chars"
+	RequestToolCount      ConfigInputHookSignals = "request_tool_count"
+	RequestTotalChars     ConfigInputHookSignals = "request_total_chars"
+	RequestedModel        ConfigInputHookSignals = "requested_model"
+	ResponseTokensOut     ConfigInputHookSignals = "response_tokens_out"
+	RoutingPolicy         ConfigInputHookSignals = "routing_policy"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputHookSignals enum.
+func (e ConfigInputHookSignals) Valid() bool {
+	switch e {
+	case CandidateBreakerState:
+		return true
+	case CandidateErrorRate:
+		return true
+	case CandidateLatencyP95Ms:
+		return true
+	case CandidateRouteCost:
+		return true
+	case RequestMessageCount:
+		return true
+	case RequestSystemChars:
+		return true
+	case RequestToolCount:
+		return true
+	case RequestTotalChars:
+		return true
+	case RequestedModel:
+		return true
+	case ResponseTokensOut:
+		return true
+	case RoutingPolicy:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputHookUser.
+const (
+	ConfigInputHookUserNo ConfigInputHookUser = "no"
+	ConfigInputHookUserRo ConfigInputHookUser = "ro"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputHookUser enum.
+func (e ConfigInputHookUser) Valid() bool {
+	switch e {
+	case ConfigInputHookUserNo:
+		return true
+	case ConfigInputHookUserRo:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit0Per.
+const (
+	ConfigInputLimit0PerDay    ConfigInputLimit0Per = "day"
+	ConfigInputLimit0PerHour   ConfigInputLimit0Per = "hour"
+	ConfigInputLimit0PerMinute ConfigInputLimit0Per = "minute"
+	ConfigInputLimit0PerMonth  ConfigInputLimit0Per = "month"
+	ConfigInputLimit0PerTotal  ConfigInputLimit0Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit0Per enum.
+func (e ConfigInputLimit0Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit0PerDay:
+		return true
+	case ConfigInputLimit0PerHour:
+		return true
+	case ConfigInputLimit0PerMinute:
+		return true
+	case ConfigInputLimit0PerMonth:
+		return true
+	case ConfigInputLimit0PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit1Per.
+const (
+	ConfigInputLimit1PerDay    ConfigInputLimit1Per = "day"
+	ConfigInputLimit1PerHour   ConfigInputLimit1Per = "hour"
+	ConfigInputLimit1PerMinute ConfigInputLimit1Per = "minute"
+	ConfigInputLimit1PerMonth  ConfigInputLimit1Per = "month"
+	ConfigInputLimit1PerTotal  ConfigInputLimit1Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit1Per enum.
+func (e ConfigInputLimit1Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit1PerDay:
+		return true
+	case ConfigInputLimit1PerHour:
+		return true
+	case ConfigInputLimit1PerMinute:
+		return true
+	case ConfigInputLimit1PerMonth:
+		return true
+	case ConfigInputLimit1PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit2Per.
+const (
+	ConfigInputLimit2PerDay    ConfigInputLimit2Per = "day"
+	ConfigInputLimit2PerHour   ConfigInputLimit2Per = "hour"
+	ConfigInputLimit2PerMinute ConfigInputLimit2Per = "minute"
+	ConfigInputLimit2PerMonth  ConfigInputLimit2Per = "month"
+	ConfigInputLimit2PerTotal  ConfigInputLimit2Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit2Per enum.
+func (e ConfigInputLimit2Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit2PerDay:
+		return true
+	case ConfigInputLimit2PerHour:
+		return true
+	case ConfigInputLimit2PerMinute:
+		return true
+	case ConfigInputLimit2PerMonth:
+		return true
+	case ConfigInputLimit2PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit3Per.
+const (
+	ConfigInputLimit3PerDay    ConfigInputLimit3Per = "day"
+	ConfigInputLimit3PerHour   ConfigInputLimit3Per = "hour"
+	ConfigInputLimit3PerMinute ConfigInputLimit3Per = "minute"
+	ConfigInputLimit3PerMonth  ConfigInputLimit3Per = "month"
+	ConfigInputLimit3PerTotal  ConfigInputLimit3Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit3Per enum.
+func (e ConfigInputLimit3Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit3PerDay:
+		return true
+	case ConfigInputLimit3PerHour:
+		return true
+	case ConfigInputLimit3PerMinute:
+		return true
+	case ConfigInputLimit3PerMonth:
+		return true
+	case ConfigInputLimit3PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit4Per.
+const (
+	ConfigInputLimit4PerDay    ConfigInputLimit4Per = "day"
+	ConfigInputLimit4PerHour   ConfigInputLimit4Per = "hour"
+	ConfigInputLimit4PerMinute ConfigInputLimit4Per = "minute"
+	ConfigInputLimit4PerMonth  ConfigInputLimit4Per = "month"
+	ConfigInputLimit4PerTotal  ConfigInputLimit4Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit4Per enum.
+func (e ConfigInputLimit4Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit4PerDay:
+		return true
+	case ConfigInputLimit4PerHour:
+		return true
+	case ConfigInputLimit4PerMinute:
+		return true
+	case ConfigInputLimit4PerMonth:
+		return true
+	case ConfigInputLimit4PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit5Per.
+const (
+	ConfigInputLimit5PerDay    ConfigInputLimit5Per = "day"
+	ConfigInputLimit5PerHour   ConfigInputLimit5Per = "hour"
+	ConfigInputLimit5PerMinute ConfigInputLimit5Per = "minute"
+	ConfigInputLimit5PerMonth  ConfigInputLimit5Per = "month"
+	ConfigInputLimit5PerTotal  ConfigInputLimit5Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit5Per enum.
+func (e ConfigInputLimit5Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit5PerDay:
+		return true
+	case ConfigInputLimit5PerHour:
+		return true
+	case ConfigInputLimit5PerMinute:
+		return true
+	case ConfigInputLimit5PerMonth:
+		return true
+	case ConfigInputLimit5PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit6Admission.
+const (
+	ConfigInputLimit6AdmissionEstimate ConfigInputLimit6Admission = "estimate"
+	ConfigInputLimit6AdmissionExact    ConfigInputLimit6Admission = "exact"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit6Admission enum.
+func (e ConfigInputLimit6Admission) Valid() bool {
+	switch e {
+	case ConfigInputLimit6AdmissionEstimate:
+		return true
+	case ConfigInputLimit6AdmissionExact:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit6OnExhaust.
+const (
+	Block     ConfigInputLimit6OnExhaust = "block"
+	Downgrade ConfigInputLimit6OnExhaust = "downgrade"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit6OnExhaust enum.
+func (e ConfigInputLimit6OnExhaust) Valid() bool {
+	switch e {
+	case Block:
+		return true
+	case Downgrade:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit6OnExhaustion.
+const (
+	ConfigInputLimit6OnExhaustionCutStream  ConfigInputLimit6OnExhaustion = "cut-stream"
+	ConfigInputLimit6OnExhaustionFinishUnit ConfigInputLimit6OnExhaustion = "finish-unit"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit6OnExhaustion enum.
+func (e ConfigInputLimit6OnExhaustion) Valid() bool {
+	switch e {
+	case ConfigInputLimit6OnExhaustionCutStream:
+		return true
+	case ConfigInputLimit6OnExhaustionFinishUnit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConfigInputLimit6Per.
+const (
+	ConfigInputLimit6PerDay    ConfigInputLimit6Per = "day"
+	ConfigInputLimit6PerHour   ConfigInputLimit6Per = "hour"
+	ConfigInputLimit6PerMinute ConfigInputLimit6Per = "minute"
+	ConfigInputLimit6PerMonth  ConfigInputLimit6Per = "month"
+	ConfigInputLimit6PerTotal  ConfigInputLimit6Per = "total"
+)
+
+// Valid indicates whether the value is a known member of the ConfigInputLimit6Per enum.
+func (e ConfigInputLimit6Per) Valid() bool {
+	switch e {
+	case ConfigInputLimit6PerDay:
+		return true
+	case ConfigInputLimit6PerHour:
+		return true
+	case ConfigInputLimit6PerMinute:
+		return true
+	case ConfigInputLimit6PerMonth:
+		return true
+	case ConfigInputLimit6PerTotal:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ConfigSettingsViewDesiredStatus.
 const (
 	Absent       ConfigSettingsViewDesiredStatus = "absent"
@@ -45,55 +564,55 @@ func (e ConfigSettingsViewDesiredStatus) Valid() bool {
 
 // Defines values for ErrorErrorCode.
 const (
-	ActionInFlight      ErrorErrorCode = "action_in_flight"
-	Conflict            ErrorErrorCode = "conflict"
-	Forbidden           ErrorErrorCode = "forbidden"
-	IdempotencyMismatch ErrorErrorCode = "idempotency_mismatch"
-	Internal            ErrorErrorCode = "internal"
-	InvalidRequest      ErrorErrorCode = "invalid_request"
-	MethodNotAllowed    ErrorErrorCode = "method_not_allowed"
-	MutationApplied     ErrorErrorCode = "mutation_applied"
-	NotFound            ErrorErrorCode = "not_found"
-	RateLimited         ErrorErrorCode = "rate_limited"
-	RequestTooLarge     ErrorErrorCode = "request_too_large"
-	Unauthorized        ErrorErrorCode = "unauthorized"
-	Unavailable         ErrorErrorCode = "unavailable"
-	UnpricedClass       ErrorErrorCode = "unpriced_class"
-	VersionConflict     ErrorErrorCode = "version_conflict"
+	ErrorErrorCodeActionInFlight      ErrorErrorCode = "action_in_flight"
+	ErrorErrorCodeConflict            ErrorErrorCode = "conflict"
+	ErrorErrorCodeForbidden           ErrorErrorCode = "forbidden"
+	ErrorErrorCodeIdempotencyMismatch ErrorErrorCode = "idempotency_mismatch"
+	ErrorErrorCodeInternal            ErrorErrorCode = "internal"
+	ErrorErrorCodeInvalidRequest      ErrorErrorCode = "invalid_request"
+	ErrorErrorCodeMethodNotAllowed    ErrorErrorCode = "method_not_allowed"
+	ErrorErrorCodeMutationApplied     ErrorErrorCode = "mutation_applied"
+	ErrorErrorCodeNotFound            ErrorErrorCode = "not_found"
+	ErrorErrorCodeRateLimited         ErrorErrorCode = "rate_limited"
+	ErrorErrorCodeRequestTooLarge     ErrorErrorCode = "request_too_large"
+	ErrorErrorCodeUnauthorized        ErrorErrorCode = "unauthorized"
+	ErrorErrorCodeUnavailable         ErrorErrorCode = "unavailable"
+	ErrorErrorCodeUnpricedClass       ErrorErrorCode = "unpriced_class"
+	ErrorErrorCodeVersionConflict     ErrorErrorCode = "version_conflict"
 )
 
 // Valid indicates whether the value is a known member of the ErrorErrorCode enum.
 func (e ErrorErrorCode) Valid() bool {
 	switch e {
-	case ActionInFlight:
+	case ErrorErrorCodeActionInFlight:
 		return true
-	case Conflict:
+	case ErrorErrorCodeConflict:
 		return true
-	case Forbidden:
+	case ErrorErrorCodeForbidden:
 		return true
-	case IdempotencyMismatch:
+	case ErrorErrorCodeIdempotencyMismatch:
 		return true
-	case Internal:
+	case ErrorErrorCodeInternal:
 		return true
-	case InvalidRequest:
+	case ErrorErrorCodeInvalidRequest:
 		return true
-	case MethodNotAllowed:
+	case ErrorErrorCodeMethodNotAllowed:
 		return true
-	case MutationApplied:
+	case ErrorErrorCodeMutationApplied:
 		return true
-	case NotFound:
+	case ErrorErrorCodeNotFound:
 		return true
-	case RateLimited:
+	case ErrorErrorCodeRateLimited:
 		return true
-	case RequestTooLarge:
+	case ErrorErrorCodeRequestTooLarge:
 		return true
-	case Unauthorized:
+	case ErrorErrorCodeUnauthorized:
 		return true
-	case Unavailable:
+	case ErrorErrorCodeUnavailable:
 		return true
-	case UnpricedClass:
+	case ErrorErrorCodeUnpricedClass:
 		return true
-	case VersionConflict:
+	case ErrorErrorCodeVersionConflict:
 		return true
 	default:
 		return false
@@ -123,16 +642,16 @@ func (e KindView) Valid() bool {
 
 // Defines values for LimitViewAdmission.
 const (
-	Estimate LimitViewAdmission = "estimate"
-	Exact    LimitViewAdmission = "exact"
+	LimitViewAdmissionEstimate LimitViewAdmission = "estimate"
+	LimitViewAdmissionExact    LimitViewAdmission = "exact"
 )
 
 // Valid indicates whether the value is a known member of the LimitViewAdmission enum.
 func (e LimitViewAdmission) Valid() bool {
 	switch e {
-	case Estimate:
+	case LimitViewAdmissionEstimate:
 		return true
-	case Exact:
+	case LimitViewAdmissionExact:
 		return true
 	default:
 		return false
@@ -141,16 +660,85 @@ func (e LimitViewAdmission) Valid() bool {
 
 // Defines values for LimitViewOnExhaustion.
 const (
-	CutStream  LimitViewOnExhaustion = "cut-stream"
-	FinishUnit LimitViewOnExhaustion = "finish-unit"
+	LimitViewOnExhaustionCutStream  LimitViewOnExhaustion = "cut-stream"
+	LimitViewOnExhaustionFinishUnit LimitViewOnExhaustion = "finish-unit"
 )
 
 // Valid indicates whether the value is a known member of the LimitViewOnExhaustion enum.
 func (e LimitViewOnExhaustion) Valid() bool {
 	switch e {
-	case CutStream:
+	case LimitViewOnExhaustionCutStream:
 		return true
-	case FinishUnit:
+	case LimitViewOnExhaustionFinishUnit:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MutationAppliedErrorEffect.
+const (
+	MutationAppliedErrorEffectApplied MutationAppliedErrorEffect = "applied"
+)
+
+// Valid indicates whether the value is a known member of the MutationAppliedErrorEffect enum.
+func (e MutationAppliedErrorEffect) Valid() bool {
+	switch e {
+	case MutationAppliedErrorEffectApplied:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MutationAppliedErrorErrorCode.
+const (
+	MutationAppliedErrorErrorCodeMutationApplied MutationAppliedErrorErrorCode = "mutation_applied"
+)
+
+// Valid indicates whether the value is a known member of the MutationAppliedErrorErrorCode enum.
+func (e MutationAppliedErrorErrorCode) Valid() bool {
+	switch e {
+	case MutationAppliedErrorErrorCodeMutationApplied:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MutationAppliedErrorOperation.
+const (
+	KeyDelete MutationAppliedErrorOperation = "key.delete"
+	KeyPatch  MutationAppliedErrorOperation = "key.patch"
+	KeyRotate MutationAppliedErrorOperation = "key.rotate"
+)
+
+// Valid indicates whether the value is a known member of the MutationAppliedErrorOperation enum.
+func (e MutationAppliedErrorOperation) Valid() bool {
+	switch e {
+	case KeyDelete:
+		return true
+	case KeyPatch:
+		return true
+	case KeyRotate:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MutationAppliedErrorRecovery.
+const (
+	RereadResource      MutationAppliedErrorRecovery = "reread_resource"
+	RotateWithNewAction MutationAppliedErrorRecovery = "rotate_with_new_action"
+)
+
+// Valid indicates whether the value is a known member of the MutationAppliedErrorRecovery enum.
+func (e MutationAppliedErrorRecovery) Valid() bool {
+	switch e {
+	case RereadResource:
+		return true
+	case RotateWithNewAction:
 		return true
 	default:
 		return false
@@ -189,31 +777,31 @@ func (e Phase1) Valid() bool {
 
 // Defines values for StateView.
 const (
-	Applied           StateView = "applied"
-	ConditionConflict StateView = "condition_conflict"
-	Intent            StateView = "intent"
-	LandedUnknown     StateView = "landed_unknown"
-	Settled           StateView = "settled"
-	VerdictLanded     StateView = "verdict_landed"
-	VerdictNotLanded  StateView = "verdict_not_landed"
+	StateViewApplied           StateView = "applied"
+	StateViewConditionConflict StateView = "condition_conflict"
+	StateViewIntent            StateView = "intent"
+	StateViewLandedUnknown     StateView = "landed_unknown"
+	StateViewSettled           StateView = "settled"
+	StateViewVerdictLanded     StateView = "verdict_landed"
+	StateViewVerdictNotLanded  StateView = "verdict_not_landed"
 )
 
 // Valid indicates whether the value is a known member of the StateView enum.
 func (e StateView) Valid() bool {
 	switch e {
-	case Applied:
+	case StateViewApplied:
 		return true
-	case ConditionConflict:
+	case StateViewConditionConflict:
 		return true
-	case Intent:
+	case StateViewIntent:
 		return true
-	case LandedUnknown:
+	case StateViewLandedUnknown:
 		return true
-	case Settled:
+	case StateViewSettled:
 		return true
-	case VerdictLanded:
+	case StateViewVerdictLanded:
 		return true
-	case VerdictNotLanded:
+	case StateViewVerdictNotLanded:
 		return true
 	default:
 		return false
@@ -238,15 +826,18 @@ func (e Verdict) Valid() bool {
 	}
 }
 
-// Defines values for PutConfigSettingsJSONBody1Persist.
+// Defines values for PatchGroupsNameJSONBodyClear.
 const (
-	True PutConfigSettingsJSONBody1Persist = true
+	ChildDefault PatchGroupsNameJSONBodyClear = "child_default"
+	Parent       PatchGroupsNameJSONBodyClear = "parent"
 )
 
-// Valid indicates whether the value is a known member of the PutConfigSettingsJSONBody1Persist enum.
-func (e PutConfigSettingsJSONBody1Persist) Valid() bool {
+// Valid indicates whether the value is a known member of the PatchGroupsNameJSONBodyClear enum.
+func (e PatchGroupsNameJSONBodyClear) Valid() bool {
 	switch e {
-	case True:
+	case ChildDefault:
+		return true
+	case Parent:
 		return true
 	default:
 		return false
@@ -400,41 +991,65 @@ type AdjustView struct {
 	Lane string `json:"lane"`
 
 	// Pool The pool the correction names.
-	Pool  string      `json:"pool"`
-	Retry interface{} `json:"retry,omitempty"`
+	Pool  string           `json:"pool"`
+	Retry *AdjustViewRetry `json:"retry,omitempty"`
 }
+
+// AdjustViewRetry defines model for AdjustView.Retry.
+type AdjustViewRetry string
 
 // AdjustmentActionInFlightError defines model for AdjustmentActionInFlightError.
 type AdjustmentActionInFlightError struct {
-	Effect interface{} `json:"effect"`
+	Effect AdjustmentActionInFlightErrorEffect `json:"effect"`
 	Error  struct {
-		Code    interface{} `json:"code"`
-		Message string      `json:"message"`
+		Code    AdjustmentActionInFlightErrorErrorCode `json:"code"`
+		Message string                                 `json:"message"`
 	} `json:"error"`
-	OperationId string      `json:"operation_id"`
-	Recovery    interface{} `json:"recovery"`
+	OperationId string                                `json:"operation_id"`
+	Recovery    AdjustmentActionInFlightErrorRecovery `json:"recovery"`
 }
+
+// AdjustmentActionInFlightErrorEffect defines model for AdjustmentActionInFlightError.Effect.
+type AdjustmentActionInFlightErrorEffect string
+
+// AdjustmentActionInFlightErrorErrorCode defines model for AdjustmentActionInFlightError.Error.Code.
+type AdjustmentActionInFlightErrorErrorCode string
+
+// AdjustmentActionInFlightErrorRecovery defines model for AdjustmentActionInFlightError.Recovery.
+type AdjustmentActionInFlightErrorRecovery string
 
 // AdjustmentActionView Durable caller-action receipt. A known rejection can have a non-2xx status with this body; unknown is HTTP 409. Effect and recovery are authoritative, not the HTTP status alone. applied is true exactly when effect=applied. Unknown effects require ledger recovery and never authorize a second delta. This projection intentionally does not echo raw counts or reason.
 type AdjustmentActionView struct {
-	Actor      string      `json:"actor"`
-	Applied    bool        `json:"applied"`
-	CountScale interface{} `json:"count_scale"`
-	Effect     interface{} `json:"effect"`
+	Actor      string                     `json:"actor"`
+	Applied    bool                       `json:"applied"`
+	CountScale interface{}                `json:"count_scale"`
+	Effect     AdjustmentActionViewEffect `json:"effect"`
 
 	// Fingerprint SHA256 of exact request bytes
-	Fingerprint string      `json:"fingerprint"`
-	Operation   interface{} `json:"operation"`
-	OperationId string      `json:"operation_id"`
+	Fingerprint string                        `json:"fingerprint"`
+	Operation   AdjustmentActionViewOperation `json:"operation"`
+	OperationId string                        `json:"operation_id"`
 
 	// ReasonHash SHA256 of the reason bytes; no public reason text
-	ReasonHash string      `json:"reason_hash"`
-	Recovery   interface{} `json:"recovery"`
-	Retry      interface{} `json:"retry"`
+	ReasonHash string                       `json:"reason_hash"`
+	Recovery   AdjustmentActionViewRecovery `json:"recovery"`
+	Retry      AdjustmentActionViewRetry    `json:"retry"`
 
 	// Target Corrected key id
 	Target string `json:"target"`
 }
+
+// AdjustmentActionViewEffect defines model for AdjustmentActionView.Effect.
+type AdjustmentActionViewEffect string
+
+// AdjustmentActionViewOperation defines model for AdjustmentActionView.Operation.
+type AdjustmentActionViewOperation string
+
+// AdjustmentActionViewRecovery defines model for AdjustmentActionView.Recovery.
+type AdjustmentActionViewRecovery string
+
+// AdjustmentActionViewRetry defines model for AdjustmentActionView.Retry.
+type AdjustmentActionViewRetry string
 
 // AdjustmentResponse defines model for AdjustmentResponse.
 type AdjustmentResponse struct {
@@ -865,33 +1480,41 @@ type ConfigInputGroup struct {
 	Parent       *string                  `json:"parent,omitempty"`
 }
 
-// ConfigInputHook HookCfg accepted by admin POST/PUT and overlay. module is canonical; plugin is the legacy input alias. This differs from the deploy HookDefinition wrapper. Settings may contain hidden values and must never be reconstructed from HookView.
+// ConfigInputHook Admin hook POST/PUT input. module and phase are the canonical names; use phase:[stage] for a single stage. This differs from the deploy HookDefinition wrapper. Settings may contain hidden values and must never be reconstructed from HookView.
 type ConfigInputHook struct {
-	At      interface{}    `json:"at,omitempty"`
-	Default *bool          `json:"default,omitempty"`
-	Global  *bool          `json:"global,omitempty"`
-	Groups  *[]string      `json:"groups,omitempty"`
-	Kind    interface{}    `json:"kind"`
-	Module  *string        `json:"module,omitempty"`
-	OnEmpty interface{}    `json:"on_empty,omitempty"`
-	OnError *string        `json:"on_error,omitempty"`
-	Phase   *[]interface{} `json:"phase,omitempty"`
-	// Deprecated: this property has been marked as deprecated upstream, but no `x-deprecated-reason` was set
-	Plugin    *string                 `json:"plugin,omitempty"`
-	Priority  *int                    `json:"priority,omitempty"`
-	Prompt    interface{}             `json:"prompt,omitempty"`
-	Settings  *map[string]interface{} `json:"settings,omitempty"`
-	Signals   *[]interface{}          `json:"signals,omitempty"`
-	TimeoutMs *uint64                 `json:"timeout_ms,omitempty"`
-	User      interface{}             `json:"user,omitempty"`
-	union     json.RawMessage
+	Default   *bool                     `json:"default,omitempty"`
+	Global    *bool                     `json:"global,omitempty"`
+	Groups    *[]string                 `json:"groups,omitempty"`
+	Kind      ConfigInputHookKind       `json:"kind"`
+	Module    string                    `json:"module"`
+	OnEmpty   *ConfigInputHookOnEmpty   `json:"on_empty,omitempty"`
+	OnError   *string                   `json:"on_error,omitempty"`
+	Phase     *[]ConfigInputHookPhase   `json:"phase,omitempty"`
+	Priority  *int                      `json:"priority,omitempty"`
+	Prompt    *ConfigInputHookPrompt    `json:"prompt,omitempty"`
+	Settings  *map[string]interface{}   `json:"settings,omitempty"`
+	Signals   *[]ConfigInputHookSignals `json:"signals,omitempty"`
+	TimeoutMs *uint64                   `json:"timeout_ms,omitempty"`
+	User      *ConfigInputHookUser      `json:"user,omitempty"`
 }
 
-// ConfigInputHook0 defines model for ConfigInputHook.0.
-type ConfigInputHook0 = interface{}
+// ConfigInputHookKind defines model for ConfigInputHook.Kind.
+type ConfigInputHookKind string
 
-// ConfigInputHook1 defines model for ConfigInputHook.1.
-type ConfigInputHook1 = interface{}
+// ConfigInputHookOnEmpty defines model for ConfigInputHook.OnEmpty.
+type ConfigInputHookOnEmpty string
+
+// ConfigInputHookPhase defines model for ConfigInputHook.Phase.
+type ConfigInputHookPhase string
+
+// ConfigInputHookPrompt defines model for ConfigInputHook.Prompt.
+type ConfigInputHookPrompt string
+
+// ConfigInputHookSignals defines model for ConfigInputHook.Signals.
+type ConfigInputHookSignals string
+
+// ConfigInputHookUser defines model for ConfigInputHook.User.
+type ConfigInputHookUser string
 
 // ConfigInputLimit Exactly one unsigned u64 metric key. Budget is in cents; other units follow the named metric.
 type ConfigInputLimit struct {
@@ -900,59 +1523,89 @@ type ConfigInputLimit struct {
 
 // ConfigInputLimit0 defines model for ConfigInputLimit.0.
 type ConfigInputLimit0 struct {
-	Per      interface{} `json:"per"`
-	Pool     *string     `json:"pool,omitempty"`
-	Requests uint64      `json:"requests"`
+	Per      ConfigInputLimit0Per `json:"per"`
+	Pool     *string              `json:"pool,omitempty"`
+	Requests uint64               `json:"requests"`
 }
+
+// ConfigInputLimit0Per defines model for ConfigInputLimit.0.Per.
+type ConfigInputLimit0Per string
 
 // ConfigInputLimit1 defines model for ConfigInputLimit.1.
 type ConfigInputLimit1 struct {
-	Per    interface{} `json:"per"`
-	Pool   *string     `json:"pool,omitempty"`
-	Tokens uint64      `json:"tokens"`
+	Per    ConfigInputLimit1Per `json:"per"`
+	Pool   *string              `json:"pool,omitempty"`
+	Tokens uint64               `json:"tokens"`
 }
+
+// ConfigInputLimit1Per defines model for ConfigInputLimit.1.Per.
+type ConfigInputLimit1Per string
 
 // ConfigInputLimit2 defines model for ConfigInputLimit.2.
 type ConfigInputLimit2 struct {
-	Per         interface{} `json:"per"`
-	Pool        *string     `json:"pool,omitempty"`
-	TokensInput uint64      `json:"tokens_input"`
+	Per         ConfigInputLimit2Per `json:"per"`
+	Pool        *string              `json:"pool,omitempty"`
+	TokensInput uint64               `json:"tokens_input"`
 }
+
+// ConfigInputLimit2Per defines model for ConfigInputLimit.2.Per.
+type ConfigInputLimit2Per string
 
 // ConfigInputLimit3 defines model for ConfigInputLimit.3.
 type ConfigInputLimit3 struct {
-	Per          interface{} `json:"per"`
-	Pool         *string     `json:"pool,omitempty"`
-	TokensOutput uint64      `json:"tokens_output"`
+	Per          ConfigInputLimit3Per `json:"per"`
+	Pool         *string              `json:"pool,omitempty"`
+	TokensOutput uint64               `json:"tokens_output"`
 }
+
+// ConfigInputLimit3Per defines model for ConfigInputLimit.3.Per.
+type ConfigInputLimit3Per string
 
 // ConfigInputLimit4 defines model for ConfigInputLimit.4.
 type ConfigInputLimit4 struct {
-	Per             interface{} `json:"per"`
-	Pool            *string     `json:"pool,omitempty"`
-	TokensCacheRead uint64      `json:"tokens_cache_read"`
+	Per             ConfigInputLimit4Per `json:"per"`
+	Pool            *string              `json:"pool,omitempty"`
+	TokensCacheRead uint64               `json:"tokens_cache_read"`
 }
+
+// ConfigInputLimit4Per defines model for ConfigInputLimit.4.Per.
+type ConfigInputLimit4Per string
 
 // ConfigInputLimit5 defines model for ConfigInputLimit.5.
 type ConfigInputLimit5 struct {
-	Per              interface{} `json:"per"`
-	Pool             *string     `json:"pool,omitempty"`
-	TokensCacheWrite uint64      `json:"tokens_cache_write"`
+	Per              ConfigInputLimit5Per `json:"per"`
+	Pool             *string              `json:"pool,omitempty"`
+	TokensCacheWrite uint64               `json:"tokens_cache_write"`
 }
+
+// ConfigInputLimit5Per defines model for ConfigInputLimit.5.Per.
+type ConfigInputLimit5Per string
 
 // ConfigInputLimit6 defines model for ConfigInputLimit.6.
 type ConfigInputLimit6 struct {
 	// Admission Omitted means exact; authored presence is retained in readback.
-	Admission   interface{} `json:"admission,omitempty"`
-	Budget      uint64      `json:"budget"`
-	DowngradeTo *string     `json:"downgrade_to,omitempty"`
-	OnExhaust   interface{} `json:"on_exhaust,omitempty"`
+	Admission   *ConfigInputLimit6Admission `json:"admission,omitempty"`
+	Budget      uint64                      `json:"budget"`
+	DowngradeTo *string                     `json:"downgrade_to,omitempty"`
+	OnExhaust   *ConfigInputLimit6OnExhaust `json:"on_exhaust,omitempty"`
 
 	// OnExhaustion In-flight behavior; omitted means finish-unit. Distinct from admission-time on_exhaust.
-	OnExhaustion interface{} `json:"on_exhaustion,omitempty"`
-	Per          interface{} `json:"per"`
-	Pool         *string     `json:"pool,omitempty"`
+	OnExhaustion *ConfigInputLimit6OnExhaustion `json:"on_exhaustion,omitempty"`
+	Per          ConfigInputLimit6Per           `json:"per"`
+	Pool         *string                        `json:"pool,omitempty"`
 }
+
+// ConfigInputLimit6Admission Omitted means exact; authored presence is retained in readback.
+type ConfigInputLimit6Admission string
+
+// ConfigInputLimit6OnExhaust defines model for ConfigInputLimit.6.OnExhaust.
+type ConfigInputLimit6OnExhaust string
+
+// ConfigInputLimit6OnExhaustion In-flight behavior; omitted means finish-unit. Distinct from admission-time on_exhaust.
+type ConfigInputLimit6OnExhaustion string
+
+// ConfigInputLimit6Per defines model for ConfigInputLimit.6.Per.
+type ConfigInputLimit6Per string
 
 // ConfigInputLimit7 defines model for ConfigInputLimit.7.
 type ConfigInputLimit7 struct {
@@ -1507,22 +2160,10 @@ type HookTransportView struct {
 // through the API one they could not read back through it. `groups` and the stage pair
 // (`phase` + `fires_at`) close that.
 type HookView struct {
-	// At The LEGACY single-valued tap stage (`"request"`/`"candidate"`/`"routing"`/`"response"`), or
-	// `null`. Kept for back-compat and NOT the field to read: `null` here does NOT mean "a gate"
-	// and does not mean "unscoped". Every hook written in the current top-level `hooks:` grammar
-	// has `at: null` by construction (`config::hook_cfg_from_def` never sets it, and
-	// `--migrate-config` rewrites a legacy `at:` into `phase:`), so this field is `null` for
-	// essentially every hook a running deployment has. Read `fires_at`.
-	// 1.6.0 owner rule: a 1.5.5 client reading this view must see this field byte-for-byte, so it
-	// is RESTORED alongside `phase`/`fires_at`.
-	At *string `json:"at"`
+	// Default Whether this hook replaces the default ordering hook for pools with no named base.
+	Default bool `json:"default"`
 
-	// FiresAt The RESOLVED stage set: the stages this hook ACTUALLY fires at, in pipeline order, never
-	// empty. This is the field that answers "when does this hook run", and it is computed by
-	// `config::HookCfg::resolved_stages` through the same `fires_at_stage` predicate the firing
-	// path uses, so it cannot disagree with runtime behavior. It reflects the frozen precedence
-	// (a non-empty `phase:` wins, else the legacy single `at:`, else the four core stages) without
-	// asking the reader to re-derive it from the two spellings above.
+	// FiresAt The effective stage set in pipeline order, computed by the runtime firing predicate.
 	FiresAt []string `json:"fires_at"`
 
 	// Global Whether this hook fires on every request (globally wired).
@@ -1537,6 +2178,10 @@ type HookView struct {
 	Kind string `json:"kind"`
 	Name string `json:"name"`
 
+	// OnEmpty Configured empty-intersection fallback: `"weighted"` | `"reject"` | `"first"`.
+	// `null` preserves an omitted override, whose runtime default is fail-closed.
+	OnEmpty *string `json:"on_empty"`
+
 	// OnError Gate fallback on timeout/error, a CLOSED, unambiguous string union: one of the
 	// reserved terminals (`"weighted"` | `"reject"` | `"first"` | `"nothing"`) or the NAME of the
 	// fallback hook the chain continues through. Unambiguous by construction: the terminal words
@@ -1544,10 +2189,7 @@ type HookView struct {
 	// the terminal set is always a terminal and anything else is always a hook reference.
 	OnError string `json:"on_error"`
 
-	// Phase The `phase:` STAGE LIST exactly as configured, empty when unset. The literal config echo,
-	// for an operator diffing what they wrote against what busbar parsed. It is NOT the effective
-	// answer on its own: empty means "fall back", and what it falls back TO is `at:` if set and the
-	// four core stages otherwise. For the effective answer read `fires_at`.
+	// Phase The canonical configured stage list. Empty selects the fixed core stages.
 	Phase []string `json:"phase"`
 
 	// Priority Rewrite/reject ordering key (transform-chain order + reject tie-break).
@@ -1567,6 +2209,9 @@ type HookView struct {
 	// `GET /hooks/{name}` serve this at READ-ONLY admin scope. The values are readable only where
 	// they are writable: the config file and the config overlay.
 	SettingsKeys []string `json:"settings_keys"`
+
+	// Signals Requested signal catalog names, in configured order.
+	Signals []string `json:"signals"`
 
 	// TimeoutMs Gate decision deadline in milliseconds.
 	TimeoutMs uint64 `json:"timeout_ms"`
@@ -1705,9 +2350,8 @@ type KeyPageView struct {
 
 // KeyUsageView One key's row of the per-key aggregation: the key id/name (never the secret) + its counts.
 type KeyUsageView struct {
-	// Classes THE PLANE-DECLARED CLASSES the row's ledger lines counted outside the token split, keyed by
-	// the class name the plane declares (new in 1.6.0, [`ClassUsage`]). Absent when the row carries
-	// none, so a token-only row reads exactly as 1.5.5's.
+	// Classes Every ledgered class outside the reserved token split, keyed by class name ([`ClassUsage`]).
+	// Includes open classes from every provider and plane. Absent when the row carries none.
 	Classes *map[string]ClassUsage `json:"classes,omitempty"`
 	Id      string                 `json:"id"`
 
@@ -2127,9 +2771,8 @@ type McpTrustView struct {
 
 // ModelUsageView One (model, provider) row of the per-model aggregation.
 type ModelUsageView struct {
-	// Classes THE PLANE-DECLARED CLASSES the row's ledger lines counted outside the token split, keyed by
-	// the class name the plane declares (new in 1.6.0, [`ClassUsage`]). Absent when the row carries
-	// none, so a token-only row reads exactly as 1.5.5's.
+	// Classes Every ledgered class outside the reserved token split, keyed by class name ([`ClassUsage`]).
+	// Includes open classes from every provider and plane. Absent when the row carries none.
 	Classes  *map[string]ClassUsage `json:"classes,omitempty"`
 	Model    string                 `json:"model"`
 	Provider string                 `json:"provider"`
@@ -2187,17 +2830,10 @@ type MutatedDefView struct {
 	// entirely for a section that carries no ceiling.
 	MaxAdminScope *string `json:"max_admin_scope,omitempty"`
 
-	// Module The `module:` backing this instance (a built-in name or a signed-plugin name/alias).
-	//
-	// ALWAYS present, matching 1.5.5's wire shape byte-for-byte (`required` includes `module`,
-	// schema type `"string"`, never nullable): 1.5.5 had no named-map section whose entries
-	// carried no module, so it has no representation for one, and the ruling is 1:1 with 1.5.5
-	// rather than inventing a new shape. EMPTY-STRINGED, not omitted, for a section whose entries
-	// are not plugin instances -- today `agents:`, whose entries describe endpoints somebody else
-	// runs (`NamedMapSection::requires_module`). Every section that HAS a module requires it to be
-	// non-empty, so an empty string is unambiguous for "no module" without a `skip_serializing_if`
-	// that would shrink `required` below 1.5.5's.
-	Module string `json:"module"`
+	// Module The `module:` backing this plugin instance (a built-in name or signed-plugin name/alias).
+	// Omitted for definitions that do not instantiate a module, such as remote agents, and for
+	// an unparseable stored definition that has no string-valued module to project.
+	Module *string `json:"module,omitempty"`
 
 	// Name The instance NAME: the map key, and the token every reference site uses.
 	Name string `json:"name"`
@@ -2246,25 +2882,37 @@ type MutatedDefView struct {
 
 // MutationAppliedError The key mutation is known committed; a later cache/readback step failed. This is not a rejected/no-effect mutation. Reconcile the named resource. Rotation's new secret is not recoverable from this response; never repeat the old action to rotate again.
 type MutationAppliedError struct {
-	CredentialRecoverable interface{} `json:"credential_recoverable"`
-	Effect                interface{} `json:"effect"`
+	CredentialRecoverable interface{}                `json:"credential_recoverable"`
+	Effect                MutationAppliedErrorEffect `json:"effect"`
 	Error                 struct {
-		Code    interface{} `json:"code"`
-		Message string      `json:"message"`
+		Code    MutationAppliedErrorErrorCode `json:"code"`
+		Message string                        `json:"message"`
 	} `json:"error"`
-	Operation interface{} `json:"operation"`
-	Recovery  interface{} `json:"recovery"`
+	Operation MutationAppliedErrorOperation `json:"operation"`
+	Recovery  MutationAppliedErrorRecovery  `json:"recovery"`
 
 	// Resource Non-secret key:<id> identity
 	Resource string `json:"resource"`
 }
 
-// NamedDefView ONE definition of ONE 1.5.3 named-DEFINITION map: the read shape of the GENERIC named-map CRUD
+// MutationAppliedErrorEffect defines model for MutationAppliedError.Effect.
+type MutationAppliedErrorEffect string
+
+// MutationAppliedErrorErrorCode defines model for MutationAppliedError.Error.Code.
+type MutationAppliedErrorErrorCode string
+
+// MutationAppliedErrorOperation defines model for MutationAppliedError.Operation.
+type MutationAppliedErrorOperation string
+
+// MutationAppliedErrorRecovery defines model for MutationAppliedError.Recovery.
+type MutationAppliedErrorRecovery string
+
+// NamedDefView One definition in a named-definition map: the read shape of the generic named-map CRUD
 // (`GET /api/v1/admin/identity-providers[/{name}]`, `GET /api/v1/admin/export[/{name}]`, and
-// `tools:`/`agents:` when they land).
+// plane-owned named definitions).
 //
-// Deliberately ONE view for every section rather than one per kind: the sections share the frozen
-// `{module, settings}` spine and differ only by optional kind-specific fields, which are
+// One view serves every section: plugin instances name their backing module, while plane-owned
+// definitions can describe remote endpoints without a module. Kind-specific fields are
 // `skip_serializing_if`-omitted for a section that has none. So `/export` serves exactly
 // `{name, module, settings_keys}` while `/identity-providers` additionally carries its ceiling,
 // and a new section adds fields here (additive) instead of a parallel view + a parallel handler.
@@ -2294,17 +2942,10 @@ type NamedDefView struct {
 	// entirely for a section that carries no ceiling.
 	MaxAdminScope *string `json:"max_admin_scope,omitempty"`
 
-	// Module The `module:` backing this instance (a built-in name or a signed-plugin name/alias).
-	//
-	// ALWAYS present, matching 1.5.5's wire shape byte-for-byte (`required` includes `module`,
-	// schema type `"string"`, never nullable): 1.5.5 had no named-map section whose entries
-	// carried no module, so it has no representation for one, and the ruling is 1:1 with 1.5.5
-	// rather than inventing a new shape. EMPTY-STRINGED, not omitted, for a section whose entries
-	// are not plugin instances -- today `agents:`, whose entries describe endpoints somebody else
-	// runs (`NamedMapSection::requires_module`). Every section that HAS a module requires it to be
-	// non-empty, so an empty string is unambiguous for "no module" without a `skip_serializing_if`
-	// that would shrink `required` below 1.5.5's.
-	Module string `json:"module"`
+	// Module The `module:` backing this plugin instance (a built-in name or signed-plugin name/alias).
+	// Omitted for definitions that do not instantiate a module, such as remote agents, and for
+	// an unparseable stored definition that has no string-valued module to project.
+	Module *string `json:"module,omitempty"`
 
 	// Name The instance NAME: the map key, and the token every reference site uses.
 	Name string `json:"name"`
@@ -3063,9 +3704,8 @@ type UpdateKeyReq struct {
 // UsageBreakdown The raw consumption counts + the derived spend estimate: the one shape shared by `total`,
 // `by_model` rows, and `by_key` rows, so a consumer writes ONE aggregation reader.
 type UsageBreakdown struct {
-	// Classes THE PLANE-DECLARED CLASSES the row's ledger lines counted outside the token split, keyed by
-	// the class name the plane declares (new in 1.6.0, [`ClassUsage`]). Absent when the row carries
-	// none, so a token-only row reads exactly as 1.5.5's.
+	// Classes Every ledgered class outside the reserved token split, keyed by class name ([`ClassUsage`]).
+	// Includes open classes from every provider and plane. Absent when the row carries none.
 	Classes  *map[string]ClassUsage `json:"classes,omitempty"`
 	Requests uint64                 `json:"requests"`
 
@@ -3186,6 +3826,11 @@ type PostAdjust400JSONResponseBody struct {
 
 // PostAdjust409JSONResponseBody defines parameters for PostAdjust.
 type PostAdjust409JSONResponseBody struct {
+	union json.RawMessage
+}
+
+// PostAdjust503JSONResponseBody defines parameters for PostAdjust.
+type PostAdjust503JSONResponseBody struct {
 	union json.RawMessage
 }
 
@@ -3313,7 +3958,6 @@ type PutConfigSettingsJSONBody1 struct {
 		Remove *[]string               `json:"remove,omitempty"`
 		Set    *map[string]interface{} `json:"set,omitempty"`
 	} `json:"document_patch"`
-	Persist *PutConfigSettingsJSONBody1Persist `json:"persist,omitempty"`
 
 	// ProvidersPatch Edits providers.yaml through its boot grammar in the same Store transaction. Paths start with catalog entry names. Deployment overrides that shadow an edit are refused.
 	ProvidersPatch *struct {
@@ -3327,9 +3971,6 @@ type PutConfigSettingsJSONBody1 struct {
 	// ResetProvidersPaths Forget only these exact prior catalog edits before merging providers_patch.
 	ResetProvidersPaths *[]string `json:"reset_providers_paths,omitempty"`
 }
-
-// PutConfigSettingsJSONBody1Persist defines parameters for PutConfigSettings.
-type PutConfigSettingsJSONBody1Persist bool
 
 // PostConfigValidateJSONBody defines parameters for PostConfigValidate.
 type PostConfigValidateJSONBody struct {
@@ -3419,11 +4060,11 @@ type DeleteGroupsNameParams struct {
 
 // PatchGroupsNameJSONBody defines parameters for PatchGroupsName.
 type PatchGroupsNameJSONBody struct {
-	ChildDefault *ConfigInputChildDefault `json:"child_default,omitempty"`
-	Clear        *[]interface{}           `json:"clear,omitempty"`
-	Enabled      *bool                    `json:"enabled,omitempty"`
-	Limits       *[]ConfigInputLimit      `json:"limits,omitempty"`
-	Parent       *string                  `json:"parent,omitempty"`
+	ChildDefault *ConfigInputChildDefault        `json:"child_default,omitempty"`
+	Clear        *[]PatchGroupsNameJSONBodyClear `json:"clear,omitempty"`
+	Enabled      *bool                           `json:"enabled,omitempty"`
+	Limits       *[]ConfigInputLimit             `json:"limits,omitempty"`
+	Parent       *string                         `json:"parent,omitempty"`
 }
 
 // PatchGroupsNameParams defines parameters for PatchGroupsName.
@@ -3431,6 +4072,9 @@ type PatchGroupsNameParams struct {
 	// IfMatch Optimistic concurrency: the resource's ETag from a prior read (or the ETag returned by the previous mutation). Stale = 409 `version_conflict` (re-read and retry), nothing changes; absent or `*` = unconditional.
 	IfMatch *string `json:"If-Match,omitempty"`
 }
+
+// PatchGroupsNameJSONBodyClear defines parameters for PatchGroupsName.
+type PatchGroupsNameJSONBodyClear string
 
 // PutGroupsNameJSONBody defines parameters for PutGroupsName.
 type PutGroupsNameJSONBody struct {
@@ -3447,7 +4091,7 @@ type PutGroupsNameParams struct {
 
 // PostHooksJSONBody defines parameters for PostHooks.
 type PostHooksJSONBody struct {
-	// Config HookCfg accepted by admin POST/PUT and overlay. module is canonical; plugin is the legacy input alias. This differs from the deploy HookDefinition wrapper. Settings may contain hidden values and must never be reconstructed from HookView.
+	// Config Admin hook POST/PUT input. module and phase are the canonical names; use phase:[stage] for a single stage. This differs from the deploy HookDefinition wrapper. Settings may contain hidden values and must never be reconstructed from HookView.
 	Config ConfigInputHook `json:"config"`
 
 	// Name The hook name.
@@ -3469,7 +4113,7 @@ type DeleteHooksNameParams struct {
 
 // PutHooksNameJSONBody defines parameters for PutHooksName.
 type PutHooksNameJSONBody struct {
-	// Config HookCfg accepted by admin POST/PUT and overlay. module is canonical; plugin is the legacy input alias. This differs from the deploy HookDefinition wrapper. Settings may contain hidden values and must never be reconstructed from HookView.
+	// Config Admin hook POST/PUT input. module and phase are the canonical names; use phase:[stage] for a single stage. This differs from the deploy HookDefinition wrapper. Settings may contain hidden values and must never be reconstructed from HookView.
 	Config               ConfigInputHook        `json:"config"`
 	AdditionalProperties map[string]interface{} `json:"-"`
 }
@@ -4438,303 +5082,6 @@ func (t *AuditRecipeValue) UnmarshalJSON(b []byte) error {
 	return err
 }
 
-// AsConfigInputHook0 returns the union data inside the ConfigInputHook as a ConfigInputHook0
-func (t ConfigInputHook) AsConfigInputHook0() (ConfigInputHook0, error) {
-	var body ConfigInputHook0
-	err := unmarshalJSONExact(t.union, &body)
-	return body, err
-}
-
-// FromConfigInputHook0 overwrites any union data inside the ConfigInputHook as the provided ConfigInputHook0
-func (t *ConfigInputHook) FromConfigInputHook0(v ConfigInputHook0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeConfigInputHook0 performs a merge with any union data inside the ConfigInputHook, using the provided ConfigInputHook0
-func (t *ConfigInputHook) MergeConfigInputHook0(v ConfigInputHook0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsConfigInputHook1 returns the union data inside the ConfigInputHook as a ConfigInputHook1
-func (t ConfigInputHook) AsConfigInputHook1() (ConfigInputHook1, error) {
-	var body ConfigInputHook1
-	err := unmarshalJSONExact(t.union, &body)
-	return body, err
-}
-
-// FromConfigInputHook1 overwrites any union data inside the ConfigInputHook as the provided ConfigInputHook1
-func (t *ConfigInputHook) FromConfigInputHook1(v ConfigInputHook1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergeConfigInputHook1 performs a merge with any union data inside the ConfigInputHook, using the provided ConfigInputHook1
-func (t *ConfigInputHook) MergeConfigInputHook1(v ConfigInputHook1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t ConfigInputHook) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = unmarshalJSONExact(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	object["at"], err = json.Marshal(t.At)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'at': %w", err)
-	}
-
-	if t.Default != nil {
-		object["default"], err = json.Marshal(t.Default)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'default': %w", err)
-		}
-	}
-
-	if t.Global != nil {
-		object["global"], err = json.Marshal(t.Global)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'global': %w", err)
-		}
-	}
-
-	if t.Groups != nil {
-		object["groups"], err = json.Marshal(t.Groups)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'groups': %w", err)
-		}
-	}
-
-	object["kind"], err = json.Marshal(t.Kind)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'kind': %w", err)
-	}
-
-	if t.Module != nil {
-		object["module"], err = json.Marshal(t.Module)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'module': %w", err)
-		}
-	}
-
-	object["on_empty"], err = json.Marshal(t.OnEmpty)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'on_empty': %w", err)
-	}
-
-	if t.OnError != nil {
-		object["on_error"], err = json.Marshal(t.OnError)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'on_error': %w", err)
-		}
-	}
-
-	if t.Phase != nil {
-		object["phase"], err = json.Marshal(t.Phase)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'phase': %w", err)
-		}
-	}
-
-	if t.Plugin != nil {
-		object["plugin"], err = json.Marshal(t.Plugin)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'plugin': %w", err)
-		}
-	}
-
-	if t.Priority != nil {
-		object["priority"], err = json.Marshal(t.Priority)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'priority': %w", err)
-		}
-	}
-
-	object["prompt"], err = json.Marshal(t.Prompt)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'prompt': %w", err)
-	}
-
-	if t.Settings != nil {
-		object["settings"], err = json.Marshal(t.Settings)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'settings': %w", err)
-		}
-	}
-
-	if t.Signals != nil {
-		object["signals"], err = json.Marshal(t.Signals)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'signals': %w", err)
-		}
-	}
-
-	if t.TimeoutMs != nil {
-		object["timeout_ms"], err = json.Marshal(t.TimeoutMs)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'timeout_ms': %w", err)
-		}
-	}
-
-	object["user"], err = json.Marshal(t.User)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling 'user': %w", err)
-	}
-
-	b, err = json.Marshal(object)
-	return b, err
-}
-
-func (t *ConfigInputHook) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = unmarshalJSONExact(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["at"]; found {
-		err = unmarshalJSONExact(raw, &t.At)
-		if err != nil {
-			return fmt.Errorf("error reading 'at': %w", err)
-		}
-	}
-
-	if raw, found := object["default"]; found {
-		err = unmarshalJSONExact(raw, &t.Default)
-		if err != nil {
-			return fmt.Errorf("error reading 'default': %w", err)
-		}
-	}
-
-	if raw, found := object["global"]; found {
-		err = unmarshalJSONExact(raw, &t.Global)
-		if err != nil {
-			return fmt.Errorf("error reading 'global': %w", err)
-		}
-	}
-
-	if raw, found := object["groups"]; found {
-		err = unmarshalJSONExact(raw, &t.Groups)
-		if err != nil {
-			return fmt.Errorf("error reading 'groups': %w", err)
-		}
-	}
-
-	if raw, found := object["kind"]; found {
-		err = unmarshalJSONExact(raw, &t.Kind)
-		if err != nil {
-			return fmt.Errorf("error reading 'kind': %w", err)
-		}
-	}
-
-	if raw, found := object["module"]; found {
-		err = unmarshalJSONExact(raw, &t.Module)
-		if err != nil {
-			return fmt.Errorf("error reading 'module': %w", err)
-		}
-	}
-
-	if raw, found := object["on_empty"]; found {
-		err = unmarshalJSONExact(raw, &t.OnEmpty)
-		if err != nil {
-			return fmt.Errorf("error reading 'on_empty': %w", err)
-		}
-	}
-
-	if raw, found := object["on_error"]; found {
-		err = unmarshalJSONExact(raw, &t.OnError)
-		if err != nil {
-			return fmt.Errorf("error reading 'on_error': %w", err)
-		}
-	}
-
-	if raw, found := object["phase"]; found {
-		err = unmarshalJSONExact(raw, &t.Phase)
-		if err != nil {
-			return fmt.Errorf("error reading 'phase': %w", err)
-		}
-	}
-
-	if raw, found := object["plugin"]; found {
-		err = unmarshalJSONExact(raw, &t.Plugin)
-		if err != nil {
-			return fmt.Errorf("error reading 'plugin': %w", err)
-		}
-	}
-
-	if raw, found := object["priority"]; found {
-		err = unmarshalJSONExact(raw, &t.Priority)
-		if err != nil {
-			return fmt.Errorf("error reading 'priority': %w", err)
-		}
-	}
-
-	if raw, found := object["prompt"]; found {
-		err = unmarshalJSONExact(raw, &t.Prompt)
-		if err != nil {
-			return fmt.Errorf("error reading 'prompt': %w", err)
-		}
-	}
-
-	if raw, found := object["settings"]; found {
-		err = unmarshalJSONExact(raw, &t.Settings)
-		if err != nil {
-			return fmt.Errorf("error reading 'settings': %w", err)
-		}
-	}
-
-	if raw, found := object["signals"]; found {
-		err = unmarshalJSONExact(raw, &t.Signals)
-		if err != nil {
-			return fmt.Errorf("error reading 'signals': %w", err)
-		}
-	}
-
-	if raw, found := object["timeout_ms"]; found {
-		err = unmarshalJSONExact(raw, &t.TimeoutMs)
-		if err != nil {
-			return fmt.Errorf("error reading 'timeout_ms': %w", err)
-		}
-	}
-
-	if raw, found := object["user"]; found {
-		err = unmarshalJSONExact(raw, &t.User)
-		if err != nil {
-			return fmt.Errorf("error reading 'user': %w", err)
-		}
-	}
-
-	return err
-}
-
 // AsConfigInputLimit0 returns the union data inside the ConfigInputLimit as a ConfigInputLimit0
 func (t ConfigInputLimit) AsConfigInputLimit0() (ConfigInputLimit0, error) {
 	var body ConfigInputLimit0
@@ -5435,6 +5782,94 @@ func (t PostAdjust409JSONResponseBody) MarshalJSON() ([]byte, error) {
 }
 
 func (t *PostAdjust409JSONResponseBody) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsError returns the union data inside the PostAdjust503JSONResponseBody as a Error
+func (t PostAdjust503JSONResponseBody) AsError() (Error, error) {
+	var body Error
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromError overwrites any union data inside the PostAdjust503JSONResponseBody as the provided Error
+func (t *PostAdjust503JSONResponseBody) FromError(v Error) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeError performs a merge with any union data inside the PostAdjust503JSONResponseBody, using the provided Error
+func (t *PostAdjust503JSONResponseBody) MergeError(v Error) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAdjustmentActionView returns the union data inside the PostAdjust503JSONResponseBody as a AdjustmentActionView
+func (t PostAdjust503JSONResponseBody) AsAdjustmentActionView() (AdjustmentActionView, error) {
+	var body AdjustmentActionView
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromAdjustmentActionView overwrites any union data inside the PostAdjust503JSONResponseBody as the provided AdjustmentActionView
+func (t *PostAdjust503JSONResponseBody) FromAdjustmentActionView(v AdjustmentActionView) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAdjustmentActionView performs a merge with any union data inside the PostAdjust503JSONResponseBody, using the provided AdjustmentActionView
+func (t *PostAdjust503JSONResponseBody) MergeAdjustmentActionView(v AdjustmentActionView) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsAdjustmentActionInFlightError returns the union data inside the PostAdjust503JSONResponseBody as a AdjustmentActionInFlightError
+func (t PostAdjust503JSONResponseBody) AsAdjustmentActionInFlightError() (AdjustmentActionInFlightError, error) {
+	var body AdjustmentActionInFlightError
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromAdjustmentActionInFlightError overwrites any union data inside the PostAdjust503JSONResponseBody as the provided AdjustmentActionInFlightError
+func (t *PostAdjust503JSONResponseBody) FromAdjustmentActionInFlightError(v AdjustmentActionInFlightError) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeAdjustmentActionInFlightError performs a merge with any union data inside the PostAdjust503JSONResponseBody, using the provided AdjustmentActionInFlightError
+func (t *PostAdjust503JSONResponseBody) MergeAdjustmentActionInFlightError(v AdjustmentActionInFlightError) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PostAdjust503JSONResponseBody) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PostAdjust503JSONResponseBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
@@ -15244,15 +15679,15 @@ type ClientWithResponsesInterface interface {
 // PostAdjustResponse200Headers the declared response headers of an HTTP 200 response for PostAdjust
 type PostAdjustResponse200Headers struct {
 	CacheControl          *string
-	XBusbarAdjustEffect   interface{}
-	XBusbarReceiptDurable interface{}
+	XBusbarAdjustEffect   *string
+	XBusbarReceiptDurable *string
 }
 
 // PostAdjustResponse400Headers the declared response headers of an HTTP 400 response for PostAdjust
 type PostAdjustResponse400Headers struct {
 	CacheControl          *string
-	XBusbarAdjustEffect   interface{}
-	XBusbarReceiptDurable interface{}
+	XBusbarAdjustEffect   *string
+	XBusbarReceiptDurable *string
 }
 
 // PostAdjustResponse401Headers the declared response headers of an HTTP 401 response for PostAdjust
@@ -15273,8 +15708,8 @@ type PostAdjustResponse404Headers struct {
 // PostAdjustResponse409Headers the declared response headers of an HTTP 409 response for PostAdjust
 type PostAdjustResponse409Headers struct {
 	CacheControl          *string
-	XBusbarAdjustEffect   interface{}
-	XBusbarReceiptDurable interface{}
+	XBusbarAdjustEffect   *string
+	XBusbarReceiptDurable *string
 }
 
 // PostAdjustResponse413Headers the declared response headers of an HTTP 413 response for PostAdjust
@@ -15290,8 +15725,9 @@ type PostAdjustResponse429Headers struct {
 
 // PostAdjustResponse503Headers the declared response headers of an HTTP 503 response for PostAdjust
 type PostAdjustResponse503Headers struct {
-	CacheControl *string
-	RetryAfter   *int
+	CacheControl          *string
+	XBusbarAdjustEffect   *string
+	XBusbarReceiptDurable *string
 }
 
 // PostAdjustResponseDefaultHeaders the declared response headers of an HTTP default response for PostAdjust
@@ -15319,7 +15755,7 @@ type PostAdjustResponse struct {
 	// JSON429 the response for an HTTP 429 `application/json` response
 	JSON429 *Error
 	// JSON503 the response for an HTTP 503 `application/json` response
-	JSON503 *Error
+	JSON503 *PostAdjust503JSONResponseBody
 	// JSONDefault the response for an HTTP default `application/json` response
 	JSONDefault *Error
 	// Headers200 the parsed response headers for an HTTP 200 response
@@ -15385,7 +15821,7 @@ func (r PostAdjustResponse) GetJSON429() *Error {
 }
 
 // GetJSON503 returns the response for an HTTP 503 `application/json` response
-func (r PostAdjustResponse) GetJSON503() *Error {
+func (r PostAdjustResponse) GetJSON503() *PostAdjust503JSONResponseBody {
 	return r.JSON503
 }
 
@@ -33647,7 +34083,7 @@ func ParsePostAdjustResponse(rsp *http.Response) (result *PostAdjustResponse, er
 		response.JSON429 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
-		var dest Error
+		var dest PostAdjust503JSONResponseBody
 		if err := unmarshalJSONExact(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -33673,18 +34109,18 @@ func ParsePostAdjustResponse(rsp *http.Response) (result *PostAdjustResponse, er
 			headers.CacheControl = &value
 		}
 		if values := rsp.Header.Values("x-busbar-adjust-effect"); len(values) > 0 {
-			var value interface{}
-			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "", Format: ""}); err != nil {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.XBusbarAdjustEffect = value
+			headers.XBusbarAdjustEffect = &value
 		}
 		if values := rsp.Header.Values("x-busbar-receipt-durable"); len(values) > 0 {
-			var value interface{}
-			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "", Format: ""}); err != nil {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.XBusbarReceiptDurable = value
+			headers.XBusbarReceiptDurable = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -33697,18 +34133,18 @@ func ParsePostAdjustResponse(rsp *http.Response) (result *PostAdjustResponse, er
 			headers.CacheControl = &value
 		}
 		if values := rsp.Header.Values("x-busbar-adjust-effect"); len(values) > 0 {
-			var value interface{}
-			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "", Format: ""}); err != nil {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.XBusbarAdjustEffect = value
+			headers.XBusbarAdjustEffect = &value
 		}
 		if values := rsp.Header.Values("x-busbar-receipt-durable"); len(values) > 0 {
-			var value interface{}
-			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "", Format: ""}); err != nil {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.XBusbarReceiptDurable = value
+			headers.XBusbarReceiptDurable = &value
 		}
 		response.Headers400 = &headers
 	case rsp.StatusCode == 401:
@@ -33751,18 +34187,18 @@ func ParsePostAdjustResponse(rsp *http.Response) (result *PostAdjustResponse, er
 			headers.CacheControl = &value
 		}
 		if values := rsp.Header.Values("x-busbar-adjust-effect"); len(values) > 0 {
-			var value interface{}
-			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "", Format: ""}); err != nil {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.XBusbarAdjustEffect = value
+			headers.XBusbarAdjustEffect = &value
 		}
 		if values := rsp.Header.Values("x-busbar-receipt-durable"); len(values) > 0 {
-			var value interface{}
-			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "", Format: ""}); err != nil {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.XBusbarReceiptDurable = value
+			headers.XBusbarReceiptDurable = &value
 		}
 		response.Headers409 = &headers
 	case rsp.StatusCode == 413:
@@ -33801,12 +34237,19 @@ func ParsePostAdjustResponse(rsp *http.Response) (result *PostAdjustResponse, er
 			}
 			headers.CacheControl = &value
 		}
-		if values := rsp.Header.Values("Retry-After"); len(values) > 0 {
-			var value int
-			if err := runtime.BindStyledParameterWithOptions("simple", "Retry-After", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "integer", Format: ""}); err != nil {
+		if values := rsp.Header.Values("x-busbar-adjust-effect"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-adjust-effect", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			}
-			headers.RetryAfter = &value
+			headers.XBusbarAdjustEffect = &value
+		}
+		if values := rsp.Header.Values("x-busbar-receipt-durable"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "x-busbar-receipt-durable", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XBusbarReceiptDurable = &value
 		}
 		response.Headers503 = &headers
 	case true:

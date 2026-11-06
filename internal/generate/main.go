@@ -73,6 +73,26 @@ func deriveSchema(input []byte) ([]byte, error) {
 func adaptCounts(value any) error {
 	switch node := value.(type) {
 	case map[string]any:
+		// String enums and constants already exclude non-string JSON values.
+		// oapi-codegen otherwise emits interface{} for enum-only response
+		// headers, which its string header binder cannot decode.
+		if _, typed := node["type"]; !typed {
+			if _, stringConstant := node["const"].(string); stringConstant {
+				node["type"] = "string"
+			}
+			if values, ok := node["enum"].([]any); ok && len(values) > 0 {
+				stringsOnly := true
+				for _, value := range values {
+					if _, ok := value.(string); !ok {
+						stringsOnly = false
+						break
+					}
+				}
+				if stringsOnly {
+					node["type"] = "string"
+				}
+			}
+		}
 		if err := adaptExactNumber(node); err != nil {
 			return err
 		}
