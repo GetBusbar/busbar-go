@@ -29,7 +29,7 @@ continuously synced with busbarAI's `dev` branch spec (see
 [RELEASING.md](./RELEASING.md)).
 
 The spec version above is not maintained by hand alone: CI runs
-`.github/check-readme-versions.py`, which fails the build if it stops matching
+`scripts/check-readme-versions.py`, which fails the build if it stops matching
 `openapi.json`. It went stale silently once, so now it cannot.
 
 Go modules publish via git tags — there is no registry token. `go get` fetches
