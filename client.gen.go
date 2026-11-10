@@ -745,29 +745,17 @@ func (e MutationAppliedErrorRecovery) Valid() bool {
 	}
 }
 
-// Defines values for Phase0.
+// Defines values for Phase.
 const (
-	LlmProducerDrive Phase0 = "LlmProducerDrive"
+	LlmProducerDrive     Phase = "LlmProducerDrive"
+	MountedResponseReady Phase = "MountedResponseReady"
 )
 
-// Valid indicates whether the value is a known member of the Phase0 enum.
-func (e Phase0) Valid() bool {
+// Valid indicates whether the value is a known member of the Phase enum.
+func (e Phase) Valid() bool {
 	switch e {
 	case LlmProducerDrive:
 		return true
-	default:
-		return false
-	}
-}
-
-// Defines values for Phase1.
-const (
-	MountedResponseReady Phase1 = "MountedResponseReady"
-)
-
-// Valid indicates whether the value is a known member of the Phase1 enum.
-func (e Phase1) Valid() bool {
-	switch e {
 	case MountedResponseReady:
 		return true
 	default:
@@ -2239,9 +2227,11 @@ type Identity struct {
 	// Errors Observations whose existing outcome is `error` or `exhausted` (including HTTP 503).
 	Errors          TelemetryExactU64 `json:"errors"`
 	IngressProtocol string            `json:"ingress_protocol"`
-	Phase           Phase             `json:"phase"`
-	Plane           string            `json:"plane"`
-	Pool            string            `json:"pool"`
+
+	// Phase LlmProducerDrive: producer drive returned; buffered response bytes may still be draining. MountedResponseReady: mounted handler returned its response; its body may still be streaming.
+	Phase Phase  `json:"phase"`
+	Plane string `json:"plane"`
+	Pool  string `json:"pool"`
 
 	// SumUs Cumulative sum of individual durations truncated to whole microseconds.
 	SumUs TelemetryExactU64 `json:"sum_us"`
@@ -3060,16 +3050,8 @@ type PendingRestartRemovalView struct {
 	ReloadToApply []string `json:"reload_to_apply"`
 }
 
-// Phase defines model for Phase.
-type Phase struct {
-	union json.RawMessage
-}
-
-// Phase0 Producer drive returned; buffered response bytes may still be draining.
-type Phase0 string
-
-// Phase1 A mounted handler returned its response; its body may still be streaming.
-type Phase1 string
+// Phase LlmProducerDrive: producer drive returned; buffered response bytes may still be draining. MountedResponseReady: mounted handler returned its response; its body may still be streaming.
+type Phase string
 
 // PlaneFactsClass One billable class a plane ledgers.
 type PlaneFactsClass struct {
@@ -3857,12 +3839,7 @@ type PutAgentsNameParams struct {
 
 // PatchAgentsNameSettingsJSONBody defines parameters for PatchAgentsNameSettings.
 type PatchAgentsNameSettingsJSONBody struct {
-	Edit *struct {
-		Remove *[]string               `json:"remove,omitempty"`
-		Set    *map[string]interface{} `json:"set,omitempty"`
-	} `json:"edit,omitempty"`
-	Settings *map[string]interface{} `json:"settings,omitempty"`
-	union    json.RawMessage
+	union json.RawMessage
 }
 
 // PatchAgentsNameSettingsParams defines parameters for PatchAgentsNameSettings.
@@ -3872,10 +3849,22 @@ type PatchAgentsNameSettingsParams struct {
 }
 
 // PatchAgentsNameSettingsJSONBody0 defines parameters for PatchAgentsNameSettings.
-type PatchAgentsNameSettingsJSONBody0 = interface{}
+type PatchAgentsNameSettingsJSONBody0 struct {
+	Edit *struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit,omitempty"`
+	Settings map[string]interface{} `json:"settings"`
+}
 
 // PatchAgentsNameSettingsJSONBody1 defines parameters for PatchAgentsNameSettings.
-type PatchAgentsNameSettingsJSONBody1 = interface{}
+type PatchAgentsNameSettingsJSONBody1 struct {
+	Edit struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit"`
+	Settings *map[string]interface{} `json:"settings,omitempty"`
+}
 
 // GetAuditParams defines parameters for GetAudit.
 type GetAuditParams struct {
@@ -3949,7 +3938,136 @@ type PutConfigSettingsParams struct {
 }
 
 // PutConfigSettingsJSONBody0 defines parameters for PutConfigSettings.
-type PutConfigSettingsJSONBody0 map[string]interface{}
+type PutConfigSettingsJSONBody0 struct {
+	AdminListen      *string `json:"admin_listen,omitempty"`
+	AdminRequireMtls *bool   `json:"admin_require_mtls,omitempty"`
+
+	// AdminTls Admin listener TLS: cert and key SecretRefs, plus optional client_ca.
+	AdminTls *PutConfigSettingsJSONBody_0_AdminTls `json:"admin_tls,omitempty"`
+
+	// Advanced Per-field AdvancedPatch; omitted or null members preserve their value.
+	Advanced *PutConfigSettingsJSONBody_0_Advanced `json:"advanced,omitempty"`
+
+	// Health Per-field HealthPatch; omitted or null members preserve their value.
+	Health *PutConfigSettingsJSONBody_0_Health `json:"health,omitempty"`
+
+	// Limits Per-field LimitsPatch; omitted members preserve their value. Null datagram_line_memory_bytes explicitly disables that limit.
+	Limits        *PutConfigSettingsJSONBody_0_Limits                                   `json:"limits,omitempty"`
+	Listen        *string                                                               `json:"listen,omitempty"`
+	PerRequestFee *int64                                                                `json:"per_request_fee,omitempty"`
+	RateCard      *map[string]PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties `json:"rate_card,omitempty"`
+
+	// Routing Per-field RoutingPatch; omitted or null members preserve their value.
+	Routing *PutConfigSettingsJSONBody_0_Routing `json:"routing,omitempty"`
+
+	// Security Per-field SecurityPatch; omitted or null members preserve their value.
+	Security *PutConfigSettingsJSONBody_0_Security `json:"security,omitempty"`
+
+	// Store Store selection: module and module-owned settings; requires restart.
+	Store *PutConfigSettingsJSONBody_0_Store `json:"store,omitempty"`
+
+	// Tls Inbound TLS: cert and key SecretRefs, plus optional client_ca.
+	Tls *PutConfigSettingsJSONBody_0_Tls `json:"tls,omitempty"`
+}
+
+// PutConfigSettingsJSONBody0AdminTls0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0AdminTls0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0AdminTls1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0AdminTls1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_AdminTls defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_AdminTls struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Advanced0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Advanced0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Advanced1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Advanced1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Advanced defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Advanced struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Health0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Health0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Health1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Health1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Health defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Health struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Limits0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Limits0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Limits1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Limits1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Limits defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Limits struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0RateCard0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0RateCard0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0RateCard1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0RateCard1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Routing0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Routing0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Routing1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Routing1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Routing defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Routing struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Security0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Security0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Security1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Security1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Security defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Security struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Store0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Store0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Store1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Store1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Store defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Store struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0Tls0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Tls0 map[string]interface{}
+
+// PutConfigSettingsJSONBody0Tls1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0Tls1 = []interface{}
+
+// PutConfigSettingsJSONBody_0_Tls defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_Tls struct {
+	union json.RawMessage
+}
 
 // PutConfigSettingsJSONBody1 defines parameters for PutConfigSettings.
 type PutConfigSettingsJSONBody1 struct {
@@ -4007,12 +4125,7 @@ type PutExportNameParams struct {
 
 // PatchExportNameSettingsJSONBody defines parameters for PatchExportNameSettings.
 type PatchExportNameSettingsJSONBody struct {
-	Edit *struct {
-		Remove *[]string               `json:"remove,omitempty"`
-		Set    *map[string]interface{} `json:"set,omitempty"`
-	} `json:"edit,omitempty"`
-	Settings *map[string]interface{} `json:"settings,omitempty"`
-	union    json.RawMessage
+	union json.RawMessage
 }
 
 // PatchExportNameSettingsParams defines parameters for PatchExportNameSettings.
@@ -4022,10 +4135,22 @@ type PatchExportNameSettingsParams struct {
 }
 
 // PatchExportNameSettingsJSONBody0 defines parameters for PatchExportNameSettings.
-type PatchExportNameSettingsJSONBody0 = interface{}
+type PatchExportNameSettingsJSONBody0 struct {
+	Edit *struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit,omitempty"`
+	Settings map[string]interface{} `json:"settings"`
+}
 
 // PatchExportNameSettingsJSONBody1 defines parameters for PatchExportNameSettings.
-type PatchExportNameSettingsJSONBody1 = interface{}
+type PatchExportNameSettingsJSONBody1 struct {
+	Edit struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit"`
+	Settings *map[string]interface{} `json:"settings,omitempty"`
+}
 
 // GetGroupsParams defines parameters for GetGroups.
 type GetGroupsParams struct {
@@ -4126,12 +4251,7 @@ type PutHooksNameParams struct {
 
 // PatchHooksNameSettingsJSONBody defines parameters for PatchHooksNameSettings.
 type PatchHooksNameSettingsJSONBody struct {
-	Edit *struct {
-		Remove *[]string               `json:"remove,omitempty"`
-		Set    *map[string]interface{} `json:"set,omitempty"`
-	} `json:"edit,omitempty"`
-	Settings             *map[string]interface{} `json:"settings,omitempty"`
-	AdditionalProperties map[string]interface{}  `json:"-"`
+	AdditionalProperties map[string]interface{} `json:"-"`
 	union                json.RawMessage
 }
 
@@ -4142,10 +4262,22 @@ type PatchHooksNameSettingsParams struct {
 }
 
 // PatchHooksNameSettingsJSONBody0 defines parameters for PatchHooksNameSettings.
-type PatchHooksNameSettingsJSONBody0 = interface{}
+type PatchHooksNameSettingsJSONBody0 struct {
+	Edit *struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit,omitempty"`
+	Settings map[string]interface{} `json:"settings"`
+}
 
 // PatchHooksNameSettingsJSONBody1 defines parameters for PatchHooksNameSettings.
-type PatchHooksNameSettingsJSONBody1 = interface{}
+type PatchHooksNameSettingsJSONBody1 struct {
+	Edit struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit"`
+	Settings *map[string]interface{} `json:"settings,omitempty"`
+}
 
 // DeleteIdentityProvidersNameParams defines parameters for DeleteIdentityProvidersName.
 type DeleteIdentityProvidersNameParams struct {
@@ -4164,12 +4296,7 @@ type PutIdentityProvidersNameParams struct {
 
 // PatchIdentityProvidersNameSettingsJSONBody defines parameters for PatchIdentityProvidersNameSettings.
 type PatchIdentityProvidersNameSettingsJSONBody struct {
-	Edit *struct {
-		Remove *[]string               `json:"remove,omitempty"`
-		Set    *map[string]interface{} `json:"set,omitempty"`
-	} `json:"edit,omitempty"`
-	Settings *map[string]interface{} `json:"settings,omitempty"`
-	union    json.RawMessage
+	union json.RawMessage
 }
 
 // PatchIdentityProvidersNameSettingsParams defines parameters for PatchIdentityProvidersNameSettings.
@@ -4179,10 +4306,22 @@ type PatchIdentityProvidersNameSettingsParams struct {
 }
 
 // PatchIdentityProvidersNameSettingsJSONBody0 defines parameters for PatchIdentityProvidersNameSettings.
-type PatchIdentityProvidersNameSettingsJSONBody0 = interface{}
+type PatchIdentityProvidersNameSettingsJSONBody0 struct {
+	Edit *struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit,omitempty"`
+	Settings map[string]interface{} `json:"settings"`
+}
 
 // PatchIdentityProvidersNameSettingsJSONBody1 defines parameters for PatchIdentityProvidersNameSettings.
-type PatchIdentityProvidersNameSettingsJSONBody1 = interface{}
+type PatchIdentityProvidersNameSettingsJSONBody1 struct {
+	Edit struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit"`
+	Settings *map[string]interface{} `json:"settings,omitempty"`
+}
 
 // GetKeysParams defines parameters for GetKeys.
 type GetKeysParams struct {
@@ -4324,12 +4463,7 @@ type PutToolsNameParams struct {
 
 // PatchToolsNameSettingsJSONBody defines parameters for PatchToolsNameSettings.
 type PatchToolsNameSettingsJSONBody struct {
-	Edit *struct {
-		Remove *[]string               `json:"remove,omitempty"`
-		Set    *map[string]interface{} `json:"set,omitempty"`
-	} `json:"edit,omitempty"`
-	Settings *map[string]interface{} `json:"settings,omitempty"`
-	union    json.RawMessage
+	union json.RawMessage
 }
 
 // PatchToolsNameSettingsParams defines parameters for PatchToolsNameSettings.
@@ -4339,10 +4473,22 @@ type PatchToolsNameSettingsParams struct {
 }
 
 // PatchToolsNameSettingsJSONBody0 defines parameters for PatchToolsNameSettings.
-type PatchToolsNameSettingsJSONBody0 = interface{}
+type PatchToolsNameSettingsJSONBody0 struct {
+	Edit *struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit,omitempty"`
+	Settings map[string]interface{} `json:"settings"`
+}
 
 // PatchToolsNameSettingsJSONBody1 defines parameters for PatchToolsNameSettings.
-type PatchToolsNameSettingsJSONBody1 = interface{}
+type PatchToolsNameSettingsJSONBody1 struct {
+	Edit struct {
+		Remove *[]string               `json:"remove,omitempty"`
+		Set    *map[string]interface{} `json:"set,omitempty"`
+	} `json:"edit"`
+	Settings *map[string]interface{} `json:"settings,omitempty"`
+}
 
 // GetUsageParams defines parameters for GetUsage.
 type GetUsageParams struct {
@@ -4355,7 +4501,7 @@ type GetUsageParams struct {
 
 // PostAdjustJSONRequestBody defines body for PostAdjust for application/json ContentType.
 
-type PostAdjustJSONRequestBody PostAdjustJSONBody
+type PostAdjustJSONRequestBody = PostAdjustJSONBody
 
 // PutAdminAuthJSONRequestBody defines body for PutAdminAuth for application/json ContentType.
 
@@ -4371,7 +4517,7 @@ type PostAgentsNameApproveJSONRequestBody = ApproveReq
 
 // PatchAgentsNameSettingsJSONRequestBody defines body for PatchAgentsNameSettings for application/json ContentType.
 
-type PatchAgentsNameSettingsJSONRequestBody PatchAgentsNameSettingsJSONBody
+type PatchAgentsNameSettingsJSONRequestBody = PatchAgentsNameSettingsJSONBody
 
 // PostAuthCacheFlushJSONRequestBody defines body for PostAuthCacheFlush for application/json ContentType.
 
@@ -4403,7 +4549,7 @@ type PutExportNameJSONRequestBody PutExportNameJSONBody
 
 // PatchExportNameSettingsJSONRequestBody defines body for PatchExportNameSettings for application/json ContentType.
 
-type PatchExportNameSettingsJSONRequestBody PatchExportNameSettingsJSONBody
+type PatchExportNameSettingsJSONRequestBody = PatchExportNameSettingsJSONBody
 
 // PostGroupsJSONRequestBody defines body for PostGroups for application/json ContentType.
 
@@ -4427,7 +4573,7 @@ type PutHooksNameJSONRequestBody PutHooksNameJSONBody
 
 // PatchHooksNameSettingsJSONRequestBody defines body for PatchHooksNameSettings for application/json ContentType.
 
-type PatchHooksNameSettingsJSONRequestBody PatchHooksNameSettingsJSONBody
+type PatchHooksNameSettingsJSONRequestBody = PatchHooksNameSettingsJSONBody
 
 // PutIdentityProvidersNameJSONRequestBody defines body for PutIdentityProvidersName for application/json ContentType.
 
@@ -4435,7 +4581,7 @@ type PutIdentityProvidersNameJSONRequestBody PutIdentityProvidersNameJSONBody
 
 // PatchIdentityProvidersNameSettingsJSONRequestBody defines body for PatchIdentityProvidersNameSettings for application/json ContentType.
 
-type PatchIdentityProvidersNameSettingsJSONRequestBody PatchIdentityProvidersNameSettingsJSONBody
+type PatchIdentityProvidersNameSettingsJSONRequestBody = PatchIdentityProvidersNameSettingsJSONBody
 
 // PostKeysJSONRequestBody defines body for PostKeys for application/json ContentType.
 
@@ -4487,7 +4633,7 @@ type PutToolsNameJSONRequestBody PutToolsNameJSONBody
 
 // PatchToolsNameSettingsJSONRequestBody defines body for PatchToolsNameSettings for application/json ContentType.
 
-type PatchToolsNameSettingsJSONRequestBody PatchToolsNameSettingsJSONBody
+type PatchToolsNameSettingsJSONRequestBody = PatchToolsNameSettingsJSONBody
 
 // PostTrustApproveJSONRequestBody defines body for PostTrustApprove for application/json ContentType.
 
@@ -5424,68 +5570,6 @@ func (t *ExactAdjustReq_Delta_AdditionalProperties) UnmarshalJSON(b []byte) erro
 	return err
 }
 
-// AsPhase0 returns the union data inside the Phase as a Phase0
-func (t Phase) AsPhase0() (Phase0, error) {
-	var body Phase0
-	err := unmarshalJSONExact(t.union, &body)
-	return body, err
-}
-
-// FromPhase0 overwrites any union data inside the Phase as the provided Phase0
-func (t *Phase) FromPhase0(v Phase0) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePhase0 performs a merge with any union data inside the Phase, using the provided Phase0
-func (t *Phase) MergePhase0(v Phase0) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-// AsPhase1 returns the union data inside the Phase as a Phase1
-func (t Phase) AsPhase1() (Phase1, error) {
-	var body Phase1
-	err := unmarshalJSONExact(t.union, &body)
-	return body, err
-}
-
-// FromPhase1 overwrites any union data inside the Phase as the provided Phase1
-func (t *Phase) FromPhase1(v Phase1) error {
-	b, err := json.Marshal(v)
-	t.union = b
-	return err
-}
-
-// MergePhase1 performs a merge with any union data inside the Phase, using the provided Phase1
-func (t *Phase) MergePhase1(v Phase1) error {
-	b, err := json.Marshal(v)
-	if err != nil {
-		return err
-	}
-
-	merged, err := runtime.JSONMerge(t.union, b)
-	t.union = merged
-	return err
-}
-
-func (t Phase) MarshalJSON() ([]byte, error) {
-	b, err := t.union.MarshalJSON()
-	return b, err
-}
-
-func (t *Phase) UnmarshalJSON(b []byte) error {
-	err := t.union.UnmarshalJSON(b)
-	return err
-}
-
 // AsPagePoolView returns the union data inside the PoolListView as a PagePoolView
 func (t PoolListView) AsPagePoolView() (PagePoolView, error) {
 	var body PagePoolView
@@ -5928,59 +6012,11 @@ func (t *PatchAgentsNameSettingsJSONBody) MergePatchAgentsNameSettingsJSONBody1(
 
 func (t PatchAgentsNameSettingsJSONBody) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = unmarshalJSONExact(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if t.Edit != nil {
-		object["edit"], err = json.Marshal(t.Edit)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'edit': %w", err)
-		}
-	}
-
-	if t.Settings != nil {
-		object["settings"], err = json.Marshal(t.Settings)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'settings': %w", err)
-		}
-	}
-	b, err = json.Marshal(object)
 	return b, err
 }
 
 func (t *PatchAgentsNameSettingsJSONBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = unmarshalJSONExact(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["edit"]; found {
-		err = unmarshalJSONExact(raw, &t.Edit)
-		if err != nil {
-			return fmt.Errorf("error reading 'edit': %w", err)
-		}
-	}
-
-	if raw, found := object["settings"]; found {
-		err = unmarshalJSONExact(raw, &t.Settings)
-		if err != nil {
-			return fmt.Errorf("error reading 'settings': %w", err)
-		}
-	}
-
 	return err
 }
 
@@ -6046,6 +6082,564 @@ func (t *PutConfigSettingsJSONBody) UnmarshalJSON(b []byte) error {
 	return err
 }
 
+// AsPutConfigSettingsJSONBody0AdminTls0 returns the union data inside the PutConfigSettingsJSONBody_0_AdminTls as a PutConfigSettingsJSONBody0AdminTls0
+func (t PutConfigSettingsJSONBody_0_AdminTls) AsPutConfigSettingsJSONBody0AdminTls0() (PutConfigSettingsJSONBody0AdminTls0, error) {
+	var body PutConfigSettingsJSONBody0AdminTls0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0AdminTls0 overwrites any union data inside the PutConfigSettingsJSONBody_0_AdminTls as the provided PutConfigSettingsJSONBody0AdminTls0
+func (t *PutConfigSettingsJSONBody_0_AdminTls) FromPutConfigSettingsJSONBody0AdminTls0(v PutConfigSettingsJSONBody0AdminTls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0AdminTls0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_AdminTls, using the provided PutConfigSettingsJSONBody0AdminTls0
+func (t *PutConfigSettingsJSONBody_0_AdminTls) MergePutConfigSettingsJSONBody0AdminTls0(v PutConfigSettingsJSONBody0AdminTls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0AdminTls1 returns the union data inside the PutConfigSettingsJSONBody_0_AdminTls as a PutConfigSettingsJSONBody0AdminTls1
+func (t PutConfigSettingsJSONBody_0_AdminTls) AsPutConfigSettingsJSONBody0AdminTls1() (PutConfigSettingsJSONBody0AdminTls1, error) {
+	var body PutConfigSettingsJSONBody0AdminTls1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0AdminTls1 overwrites any union data inside the PutConfigSettingsJSONBody_0_AdminTls as the provided PutConfigSettingsJSONBody0AdminTls1
+func (t *PutConfigSettingsJSONBody_0_AdminTls) FromPutConfigSettingsJSONBody0AdminTls1(v PutConfigSettingsJSONBody0AdminTls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0AdminTls1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_AdminTls, using the provided PutConfigSettingsJSONBody0AdminTls1
+func (t *PutConfigSettingsJSONBody_0_AdminTls) MergePutConfigSettingsJSONBody0AdminTls1(v PutConfigSettingsJSONBody0AdminTls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_AdminTls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_AdminTls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Advanced0 returns the union data inside the PutConfigSettingsJSONBody_0_Advanced as a PutConfigSettingsJSONBody0Advanced0
+func (t PutConfigSettingsJSONBody_0_Advanced) AsPutConfigSettingsJSONBody0Advanced0() (PutConfigSettingsJSONBody0Advanced0, error) {
+	var body PutConfigSettingsJSONBody0Advanced0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Advanced0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Advanced as the provided PutConfigSettingsJSONBody0Advanced0
+func (t *PutConfigSettingsJSONBody_0_Advanced) FromPutConfigSettingsJSONBody0Advanced0(v PutConfigSettingsJSONBody0Advanced0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Advanced0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Advanced, using the provided PutConfigSettingsJSONBody0Advanced0
+func (t *PutConfigSettingsJSONBody_0_Advanced) MergePutConfigSettingsJSONBody0Advanced0(v PutConfigSettingsJSONBody0Advanced0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Advanced1 returns the union data inside the PutConfigSettingsJSONBody_0_Advanced as a PutConfigSettingsJSONBody0Advanced1
+func (t PutConfigSettingsJSONBody_0_Advanced) AsPutConfigSettingsJSONBody0Advanced1() (PutConfigSettingsJSONBody0Advanced1, error) {
+	var body PutConfigSettingsJSONBody0Advanced1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Advanced1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Advanced as the provided PutConfigSettingsJSONBody0Advanced1
+func (t *PutConfigSettingsJSONBody_0_Advanced) FromPutConfigSettingsJSONBody0Advanced1(v PutConfigSettingsJSONBody0Advanced1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Advanced1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Advanced, using the provided PutConfigSettingsJSONBody0Advanced1
+func (t *PutConfigSettingsJSONBody_0_Advanced) MergePutConfigSettingsJSONBody0Advanced1(v PutConfigSettingsJSONBody0Advanced1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Advanced) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Advanced) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Health0 returns the union data inside the PutConfigSettingsJSONBody_0_Health as a PutConfigSettingsJSONBody0Health0
+func (t PutConfigSettingsJSONBody_0_Health) AsPutConfigSettingsJSONBody0Health0() (PutConfigSettingsJSONBody0Health0, error) {
+	var body PutConfigSettingsJSONBody0Health0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Health0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Health as the provided PutConfigSettingsJSONBody0Health0
+func (t *PutConfigSettingsJSONBody_0_Health) FromPutConfigSettingsJSONBody0Health0(v PutConfigSettingsJSONBody0Health0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Health0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Health, using the provided PutConfigSettingsJSONBody0Health0
+func (t *PutConfigSettingsJSONBody_0_Health) MergePutConfigSettingsJSONBody0Health0(v PutConfigSettingsJSONBody0Health0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Health1 returns the union data inside the PutConfigSettingsJSONBody_0_Health as a PutConfigSettingsJSONBody0Health1
+func (t PutConfigSettingsJSONBody_0_Health) AsPutConfigSettingsJSONBody0Health1() (PutConfigSettingsJSONBody0Health1, error) {
+	var body PutConfigSettingsJSONBody0Health1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Health1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Health as the provided PutConfigSettingsJSONBody0Health1
+func (t *PutConfigSettingsJSONBody_0_Health) FromPutConfigSettingsJSONBody0Health1(v PutConfigSettingsJSONBody0Health1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Health1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Health, using the provided PutConfigSettingsJSONBody0Health1
+func (t *PutConfigSettingsJSONBody_0_Health) MergePutConfigSettingsJSONBody0Health1(v PutConfigSettingsJSONBody0Health1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Health) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Health) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Limits0 returns the union data inside the PutConfigSettingsJSONBody_0_Limits as a PutConfigSettingsJSONBody0Limits0
+func (t PutConfigSettingsJSONBody_0_Limits) AsPutConfigSettingsJSONBody0Limits0() (PutConfigSettingsJSONBody0Limits0, error) {
+	var body PutConfigSettingsJSONBody0Limits0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Limits0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Limits as the provided PutConfigSettingsJSONBody0Limits0
+func (t *PutConfigSettingsJSONBody_0_Limits) FromPutConfigSettingsJSONBody0Limits0(v PutConfigSettingsJSONBody0Limits0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Limits0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Limits, using the provided PutConfigSettingsJSONBody0Limits0
+func (t *PutConfigSettingsJSONBody_0_Limits) MergePutConfigSettingsJSONBody0Limits0(v PutConfigSettingsJSONBody0Limits0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Limits1 returns the union data inside the PutConfigSettingsJSONBody_0_Limits as a PutConfigSettingsJSONBody0Limits1
+func (t PutConfigSettingsJSONBody_0_Limits) AsPutConfigSettingsJSONBody0Limits1() (PutConfigSettingsJSONBody0Limits1, error) {
+	var body PutConfigSettingsJSONBody0Limits1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Limits1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Limits as the provided PutConfigSettingsJSONBody0Limits1
+func (t *PutConfigSettingsJSONBody_0_Limits) FromPutConfigSettingsJSONBody0Limits1(v PutConfigSettingsJSONBody0Limits1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Limits1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Limits, using the provided PutConfigSettingsJSONBody0Limits1
+func (t *PutConfigSettingsJSONBody_0_Limits) MergePutConfigSettingsJSONBody0Limits1(v PutConfigSettingsJSONBody0Limits1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Limits) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Limits) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0RateCard0 returns the union data inside the PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties as a PutConfigSettingsJSONBody0RateCard0
+func (t PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) AsPutConfigSettingsJSONBody0RateCard0() (PutConfigSettingsJSONBody0RateCard0, error) {
+	var body PutConfigSettingsJSONBody0RateCard0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0RateCard0 overwrites any union data inside the PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties as the provided PutConfigSettingsJSONBody0RateCard0
+func (t *PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) FromPutConfigSettingsJSONBody0RateCard0(v PutConfigSettingsJSONBody0RateCard0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0RateCard0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties, using the provided PutConfigSettingsJSONBody0RateCard0
+func (t *PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) MergePutConfigSettingsJSONBody0RateCard0(v PutConfigSettingsJSONBody0RateCard0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0RateCard1 returns the union data inside the PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties as a PutConfigSettingsJSONBody0RateCard1
+func (t PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) AsPutConfigSettingsJSONBody0RateCard1() (PutConfigSettingsJSONBody0RateCard1, error) {
+	var body PutConfigSettingsJSONBody0RateCard1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0RateCard1 overwrites any union data inside the PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties as the provided PutConfigSettingsJSONBody0RateCard1
+func (t *PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) FromPutConfigSettingsJSONBody0RateCard1(v PutConfigSettingsJSONBody0RateCard1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0RateCard1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties, using the provided PutConfigSettingsJSONBody0RateCard1
+func (t *PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) MergePutConfigSettingsJSONBody0RateCard1(v PutConfigSettingsJSONBody0RateCard1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Routing0 returns the union data inside the PutConfigSettingsJSONBody_0_Routing as a PutConfigSettingsJSONBody0Routing0
+func (t PutConfigSettingsJSONBody_0_Routing) AsPutConfigSettingsJSONBody0Routing0() (PutConfigSettingsJSONBody0Routing0, error) {
+	var body PutConfigSettingsJSONBody0Routing0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Routing0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Routing as the provided PutConfigSettingsJSONBody0Routing0
+func (t *PutConfigSettingsJSONBody_0_Routing) FromPutConfigSettingsJSONBody0Routing0(v PutConfigSettingsJSONBody0Routing0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Routing0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Routing, using the provided PutConfigSettingsJSONBody0Routing0
+func (t *PutConfigSettingsJSONBody_0_Routing) MergePutConfigSettingsJSONBody0Routing0(v PutConfigSettingsJSONBody0Routing0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Routing1 returns the union data inside the PutConfigSettingsJSONBody_0_Routing as a PutConfigSettingsJSONBody0Routing1
+func (t PutConfigSettingsJSONBody_0_Routing) AsPutConfigSettingsJSONBody0Routing1() (PutConfigSettingsJSONBody0Routing1, error) {
+	var body PutConfigSettingsJSONBody0Routing1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Routing1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Routing as the provided PutConfigSettingsJSONBody0Routing1
+func (t *PutConfigSettingsJSONBody_0_Routing) FromPutConfigSettingsJSONBody0Routing1(v PutConfigSettingsJSONBody0Routing1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Routing1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Routing, using the provided PutConfigSettingsJSONBody0Routing1
+func (t *PutConfigSettingsJSONBody_0_Routing) MergePutConfigSettingsJSONBody0Routing1(v PutConfigSettingsJSONBody0Routing1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Routing) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Routing) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Security0 returns the union data inside the PutConfigSettingsJSONBody_0_Security as a PutConfigSettingsJSONBody0Security0
+func (t PutConfigSettingsJSONBody_0_Security) AsPutConfigSettingsJSONBody0Security0() (PutConfigSettingsJSONBody0Security0, error) {
+	var body PutConfigSettingsJSONBody0Security0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Security0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Security as the provided PutConfigSettingsJSONBody0Security0
+func (t *PutConfigSettingsJSONBody_0_Security) FromPutConfigSettingsJSONBody0Security0(v PutConfigSettingsJSONBody0Security0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Security0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Security, using the provided PutConfigSettingsJSONBody0Security0
+func (t *PutConfigSettingsJSONBody_0_Security) MergePutConfigSettingsJSONBody0Security0(v PutConfigSettingsJSONBody0Security0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Security1 returns the union data inside the PutConfigSettingsJSONBody_0_Security as a PutConfigSettingsJSONBody0Security1
+func (t PutConfigSettingsJSONBody_0_Security) AsPutConfigSettingsJSONBody0Security1() (PutConfigSettingsJSONBody0Security1, error) {
+	var body PutConfigSettingsJSONBody0Security1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Security1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Security as the provided PutConfigSettingsJSONBody0Security1
+func (t *PutConfigSettingsJSONBody_0_Security) FromPutConfigSettingsJSONBody0Security1(v PutConfigSettingsJSONBody0Security1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Security1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Security, using the provided PutConfigSettingsJSONBody0Security1
+func (t *PutConfigSettingsJSONBody_0_Security) MergePutConfigSettingsJSONBody0Security1(v PutConfigSettingsJSONBody0Security1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Security) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Security) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Store0 returns the union data inside the PutConfigSettingsJSONBody_0_Store as a PutConfigSettingsJSONBody0Store0
+func (t PutConfigSettingsJSONBody_0_Store) AsPutConfigSettingsJSONBody0Store0() (PutConfigSettingsJSONBody0Store0, error) {
+	var body PutConfigSettingsJSONBody0Store0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Store0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Store as the provided PutConfigSettingsJSONBody0Store0
+func (t *PutConfigSettingsJSONBody_0_Store) FromPutConfigSettingsJSONBody0Store0(v PutConfigSettingsJSONBody0Store0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Store0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Store, using the provided PutConfigSettingsJSONBody0Store0
+func (t *PutConfigSettingsJSONBody_0_Store) MergePutConfigSettingsJSONBody0Store0(v PutConfigSettingsJSONBody0Store0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Store1 returns the union data inside the PutConfigSettingsJSONBody_0_Store as a PutConfigSettingsJSONBody0Store1
+func (t PutConfigSettingsJSONBody_0_Store) AsPutConfigSettingsJSONBody0Store1() (PutConfigSettingsJSONBody0Store1, error) {
+	var body PutConfigSettingsJSONBody0Store1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Store1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Store as the provided PutConfigSettingsJSONBody0Store1
+func (t *PutConfigSettingsJSONBody_0_Store) FromPutConfigSettingsJSONBody0Store1(v PutConfigSettingsJSONBody0Store1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Store1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Store, using the provided PutConfigSettingsJSONBody0Store1
+func (t *PutConfigSettingsJSONBody_0_Store) MergePutConfigSettingsJSONBody0Store1(v PutConfigSettingsJSONBody0Store1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Store) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Store) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Tls0 returns the union data inside the PutConfigSettingsJSONBody_0_Tls as a PutConfigSettingsJSONBody0Tls0
+func (t PutConfigSettingsJSONBody_0_Tls) AsPutConfigSettingsJSONBody0Tls0() (PutConfigSettingsJSONBody0Tls0, error) {
+	var body PutConfigSettingsJSONBody0Tls0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Tls0 overwrites any union data inside the PutConfigSettingsJSONBody_0_Tls as the provided PutConfigSettingsJSONBody0Tls0
+func (t *PutConfigSettingsJSONBody_0_Tls) FromPutConfigSettingsJSONBody0Tls0(v PutConfigSettingsJSONBody0Tls0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Tls0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Tls, using the provided PutConfigSettingsJSONBody0Tls0
+func (t *PutConfigSettingsJSONBody_0_Tls) MergePutConfigSettingsJSONBody0Tls0(v PutConfigSettingsJSONBody0Tls0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0Tls1 returns the union data inside the PutConfigSettingsJSONBody_0_Tls as a PutConfigSettingsJSONBody0Tls1
+func (t PutConfigSettingsJSONBody_0_Tls) AsPutConfigSettingsJSONBody0Tls1() (PutConfigSettingsJSONBody0Tls1, error) {
+	var body PutConfigSettingsJSONBody0Tls1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0Tls1 overwrites any union data inside the PutConfigSettingsJSONBody_0_Tls as the provided PutConfigSettingsJSONBody0Tls1
+func (t *PutConfigSettingsJSONBody_0_Tls) FromPutConfigSettingsJSONBody0Tls1(v PutConfigSettingsJSONBody0Tls1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0Tls1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_Tls, using the provided PutConfigSettingsJSONBody0Tls1
+func (t *PutConfigSettingsJSONBody_0_Tls) MergePutConfigSettingsJSONBody0Tls1(v PutConfigSettingsJSONBody0Tls1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_Tls) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_Tls) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
 // AsPatchExportNameSettingsJSONBody0 returns the union data inside the PatchExportNameSettingsJSONBody as a PatchExportNameSettingsJSONBody0
 func (t PatchExportNameSettingsJSONBody) AsPatchExportNameSettingsJSONBody0() (PatchExportNameSettingsJSONBody0, error) {
 	var body PatchExportNameSettingsJSONBody0
@@ -6100,59 +6694,11 @@ func (t *PatchExportNameSettingsJSONBody) MergePatchExportNameSettingsJSONBody1(
 
 func (t PatchExportNameSettingsJSONBody) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = unmarshalJSONExact(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if t.Edit != nil {
-		object["edit"], err = json.Marshal(t.Edit)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'edit': %w", err)
-		}
-	}
-
-	if t.Settings != nil {
-		object["settings"], err = json.Marshal(t.Settings)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'settings': %w", err)
-		}
-	}
-	b, err = json.Marshal(object)
 	return b, err
 }
 
 func (t *PatchExportNameSettingsJSONBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = unmarshalJSONExact(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["edit"]; found {
-		err = unmarshalJSONExact(raw, &t.Edit)
-		if err != nil {
-			return fmt.Errorf("error reading 'edit': %w", err)
-		}
-	}
-
-	if raw, found := object["settings"]; found {
-		err = unmarshalJSONExact(raw, &t.Settings)
-		if err != nil {
-			return fmt.Errorf("error reading 'settings': %w", err)
-		}
-	}
-
 	return err
 }
 
@@ -6262,59 +6808,11 @@ func (t *PatchIdentityProvidersNameSettingsJSONBody) MergePatchIdentityProviders
 
 func (t PatchIdentityProvidersNameSettingsJSONBody) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = unmarshalJSONExact(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if t.Edit != nil {
-		object["edit"], err = json.Marshal(t.Edit)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'edit': %w", err)
-		}
-	}
-
-	if t.Settings != nil {
-		object["settings"], err = json.Marshal(t.Settings)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'settings': %w", err)
-		}
-	}
-	b, err = json.Marshal(object)
 	return b, err
 }
 
 func (t *PatchIdentityProvidersNameSettingsJSONBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = unmarshalJSONExact(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["edit"]; found {
-		err = unmarshalJSONExact(raw, &t.Edit)
-		if err != nil {
-			return fmt.Errorf("error reading 'edit': %w", err)
-		}
-	}
-
-	if raw, found := object["settings"]; found {
-		err = unmarshalJSONExact(raw, &t.Settings)
-		if err != nil {
-			return fmt.Errorf("error reading 'settings': %w", err)
-		}
-	}
-
 	return err
 }
 
@@ -6558,59 +7056,11 @@ func (t *PatchToolsNameSettingsJSONBody) MergePatchToolsNameSettingsJSONBody1(v 
 
 func (t PatchToolsNameSettingsJSONBody) MarshalJSON() ([]byte, error) {
 	b, err := t.union.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-	object := make(map[string]json.RawMessage)
-	if t.union != nil {
-		err = unmarshalJSONExact(b, &object)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if t.Edit != nil {
-		object["edit"], err = json.Marshal(t.Edit)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'edit': %w", err)
-		}
-	}
-
-	if t.Settings != nil {
-		object["settings"], err = json.Marshal(t.Settings)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'settings': %w", err)
-		}
-	}
-	b, err = json.Marshal(object)
 	return b, err
 }
 
 func (t *PatchToolsNameSettingsJSONBody) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
-	if err != nil {
-		return err
-	}
-	object := make(map[string]json.RawMessage)
-	err = unmarshalJSONExact(b, &object)
-	if err != nil {
-		return err
-	}
-
-	if raw, found := object["edit"]; found {
-		err = unmarshalJSONExact(raw, &t.Edit)
-		if err != nil {
-			return fmt.Errorf("error reading 'edit': %w", err)
-		}
-	}
-
-	if raw, found := object["settings"]; found {
-		err = unmarshalJSONExact(raw, &t.Settings)
-		if err != nil {
-			return fmt.Errorf("error reading 'settings': %w", err)
-		}
-	}
-
 	return err
 }
 
@@ -6624,22 +7074,6 @@ func (a *PatchHooksNameSettingsJSONBody) UnmarshalJSON(b []byte) error {
 	err = unmarshalJSONExact(b, &object)
 	if err != nil {
 		return err
-	}
-
-	if raw, found := object["edit"]; found {
-		err = unmarshalJSONExact(raw, &a.Edit)
-		if err != nil {
-			return fmt.Errorf("error reading 'edit': %w", err)
-		}
-		delete(object, "edit")
-	}
-
-	if raw, found := object["settings"]; found {
-		err = unmarshalJSONExact(raw, &a.Settings)
-		if err != nil {
-			return fmt.Errorf("error reading 'settings': %w", err)
-		}
-		delete(object, "settings")
 	}
 
 	if len(object) != 0 {
@@ -6668,20 +7102,6 @@ func (a PatchHooksNameSettingsJSONBody) MarshalJSON() ([]byte, error) {
 		err = unmarshalJSONExact(b, &object)
 		if err != nil {
 			return nil, err
-		}
-	}
-
-	if a.Edit != nil {
-		object["edit"], err = json.Marshal(a.Edit)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'edit': %w", err)
-		}
-	}
-
-	if a.Settings != nil {
-		object["settings"], err = json.Marshal(a.Settings)
-		if err != nil {
-			return nil, fmt.Errorf("error marshaling 'settings': %w", err)
 		}
 	}
 
@@ -15862,6 +16282,7 @@ func (r PostAdjustResponse) ContentType() string {
 // GetAdminAuthResponse200Headers the declared response headers of an HTTP 200 response for GetAdminAuth
 type GetAdminAuthResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetAdminAuthResponse401Headers the declared response headers of an HTTP 401 response for GetAdminAuth
@@ -15995,6 +16416,7 @@ func (r GetAdminAuthResponse) ContentType() string {
 // PutAdminAuthResponse200Headers the declared response headers of an HTTP 200 response for PutAdminAuth
 type PutAdminAuthResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutAdminAuthResponse400Headers the declared response headers of an HTTP 400 response for PutAdminAuth
@@ -16171,6 +16593,7 @@ func (r PutAdminAuthResponse) ContentType() string {
 // GetAgentsResponse200Headers the declared response headers of an HTTP 200 response for GetAgents
 type GetAgentsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetAgentsResponse401Headers the declared response headers of an HTTP 401 response for GetAgents
@@ -16304,6 +16727,7 @@ func (r GetAgentsResponse) ContentType() string {
 // DeleteAgentsNameResponse204Headers the declared response headers of an HTTP 204 response for DeleteAgentsName
 type DeleteAgentsNameResponse204Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteAgentsNameResponse400Headers the declared response headers of an HTTP 400 response for DeleteAgentsName
@@ -16487,6 +16911,7 @@ func (r DeleteAgentsNameResponse) ContentType() string {
 // GetAgentsNameResponse200Headers the declared response headers of an HTTP 200 response for GetAgentsName
 type GetAgentsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetAgentsNameResponse400Headers the declared response headers of an HTTP 400 response for GetAgentsName
@@ -16648,6 +17073,7 @@ func (r GetAgentsNameResponse) ContentType() string {
 // PutAgentsNameResponse200Headers the declared response headers of an HTTP 200 response for PutAgentsName
 type PutAgentsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutAgentsNameResponse400Headers the declared response headers of an HTTP 400 response for PutAgentsName
@@ -17176,6 +17602,7 @@ func (r PostAgentsNameConnectResponse) ContentType() string {
 // PatchAgentsNameSettingsResponse200Headers the declared response headers of an HTTP 200 response for PatchAgentsNameSettings
 type PatchAgentsNameSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PatchAgentsNameSettingsResponse400Headers the declared response headers of an HTTP 400 response for PatchAgentsNameSettings
@@ -18482,6 +18909,7 @@ func (r PostCommitUpgradeResponse) ContentType() string {
 // GetConfigResponse200Headers the declared response headers of an HTTP 200 response for GetConfig
 type GetConfigResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetConfigResponse401Headers the declared response headers of an HTTP 401 response for GetConfig
@@ -18615,6 +19043,7 @@ func (r GetConfigResponse) ContentType() string {
 // PostConfigApplyResponse200Headers the declared response headers of an HTTP 200 response for PostConfigApply
 type PostConfigApplyResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostConfigApplyResponse400Headers the declared response headers of an HTTP 400 response for PostConfigApply
@@ -18952,6 +19381,7 @@ func (r GetConfigDiffResponse) ContentType() string {
 // PostConfigReloadResponse200Headers the declared response headers of an HTTP 200 response for PostConfigReload
 type PostConfigReloadResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostConfigReloadResponse400Headers the declared response headers of an HTTP 400 response for PostConfigReload
@@ -19114,6 +19544,7 @@ func (r PostConfigReloadResponse) ContentType() string {
 // PostConfigRollbackResponse200Headers the declared response headers of an HTTP 200 response for PostConfigRollback
 type PostConfigRollbackResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostConfigRollbackResponse400Headers the declared response headers of an HTTP 400 response for PostConfigRollback
@@ -19304,6 +19735,7 @@ func (r PostConfigRollbackResponse) ContentType() string {
 // GetConfigSettingsResponse200Headers the declared response headers of an HTTP 200 response for GetConfigSettings
 type GetConfigSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetConfigSettingsResponse401Headers the declared response headers of an HTTP 401 response for GetConfigSettings
@@ -19437,6 +19869,7 @@ func (r GetConfigSettingsResponse) ContentType() string {
 // PutConfigSettingsResponse200Headers the declared response headers of an HTTP 200 response for PutConfigSettings
 type PutConfigSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutConfigSettingsResponse400Headers the declared response headers of an HTTP 400 response for PutConfigSettings
@@ -20083,6 +20516,7 @@ func (r GetConfigVersionsVResponse) ContentType() string {
 // GetExportResponse200Headers the declared response headers of an HTTP 200 response for GetExport
 type GetExportResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetExportResponse401Headers the declared response headers of an HTTP 401 response for GetExport
@@ -20216,11 +20650,13 @@ func (r GetExportResponse) ContentType() string {
 // DeleteExportNameResponse200Headers the declared response headers of an HTTP 200 response for DeleteExportName
 type DeleteExportNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteExportNameResponse204Headers the declared response headers of an HTTP 204 response for DeleteExportName
 type DeleteExportNameResponse204Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteExportNameResponse400Headers the declared response headers of an HTTP 400 response for DeleteExportName
@@ -20413,6 +20849,7 @@ func (r DeleteExportNameResponse) ContentType() string {
 // GetExportNameResponse200Headers the declared response headers of an HTTP 200 response for GetExportName
 type GetExportNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetExportNameResponse400Headers the declared response headers of an HTTP 400 response for GetExportName
@@ -20574,6 +21011,7 @@ func (r GetExportNameResponse) ContentType() string {
 // PutExportNameResponse200Headers the declared response headers of an HTTP 200 response for PutExportName
 type PutExportNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutExportNameResponse400Headers the declared response headers of an HTTP 400 response for PutExportName
@@ -20750,6 +21188,7 @@ func (r PutExportNameResponse) ContentType() string {
 // PatchExportNameSettingsResponse200Headers the declared response headers of an HTTP 200 response for PatchExportNameSettings
 type PatchExportNameSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PatchExportNameSettingsResponse400Headers the declared response headers of an HTTP 400 response for PatchExportNameSettings
@@ -20940,6 +21379,7 @@ func (r PatchExportNameSettingsResponse) ContentType() string {
 // GetGroupsResponse200Headers the declared response headers of an HTTP 200 response for GetGroups
 type GetGroupsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetGroupsResponse400Headers the declared response headers of an HTTP 400 response for GetGroups
@@ -21087,11 +21527,13 @@ func (r GetGroupsResponse) ContentType() string {
 // PostGroupsResponse200Headers the declared response headers of an HTTP 200 response for PostGroups
 type PostGroupsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostGroupsResponse201Headers the declared response headers of an HTTP 201 response for PostGroups
 type PostGroupsResponse201Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostGroupsResponse400Headers the declared response headers of an HTTP 400 response for PostGroups
@@ -21277,6 +21719,7 @@ func (r PostGroupsResponse) ContentType() string {
 // DeleteGroupsNameResponse204Headers the declared response headers of an HTTP 204 response for DeleteGroupsName
 type DeleteGroupsNameResponse204Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteGroupsNameResponse400Headers the declared response headers of an HTTP 400 response for DeleteGroupsName
@@ -21460,6 +21903,7 @@ func (r DeleteGroupsNameResponse) ContentType() string {
 // GetGroupsNameResponse200Headers the declared response headers of an HTTP 200 response for GetGroupsName
 type GetGroupsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetGroupsNameResponse400Headers the declared response headers of an HTTP 400 response for GetGroupsName
@@ -21621,6 +22065,7 @@ func (r GetGroupsNameResponse) ContentType() string {
 // PatchGroupsNameResponse200Headers the declared response headers of an HTTP 200 response for PatchGroupsName
 type PatchGroupsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PatchGroupsNameResponse400Headers the declared response headers of an HTTP 400 response for PatchGroupsName
@@ -21811,6 +22256,7 @@ func (r PatchGroupsNameResponse) ContentType() string {
 // PutGroupsNameResponse200Headers the declared response headers of an HTTP 200 response for PutGroupsName
 type PutGroupsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutGroupsNameResponse400Headers the declared response headers of an HTTP 400 response for PutGroupsName
@@ -22176,6 +22622,7 @@ func (r GetGroupsNameUsageResponse) ContentType() string {
 // GetHooksResponse200Headers the declared response headers of an HTTP 200 response for GetHooks
 type GetHooksResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetHooksResponse401Headers the declared response headers of an HTTP 401 response for GetHooks
@@ -22309,11 +22756,13 @@ func (r GetHooksResponse) ContentType() string {
 // PostHooksResponse200Headers the declared response headers of an HTTP 200 response for PostHooks
 type PostHooksResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostHooksResponse201Headers the declared response headers of an HTTP 201 response for PostHooks
 type PostHooksResponse201Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostHooksResponse400Headers the declared response headers of an HTTP 400 response for PostHooks
@@ -22499,6 +22948,7 @@ func (r PostHooksResponse) ContentType() string {
 // DeleteHooksNameResponse204Headers the declared response headers of an HTTP 204 response for DeleteHooksName
 type DeleteHooksNameResponse204Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteHooksNameResponse400Headers the declared response headers of an HTTP 400 response for DeleteHooksName
@@ -22682,6 +23132,7 @@ func (r DeleteHooksNameResponse) ContentType() string {
 // GetHooksNameResponse200Headers the declared response headers of an HTTP 200 response for GetHooksName
 type GetHooksNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetHooksNameResponse400Headers the declared response headers of an HTTP 400 response for GetHooksName
@@ -22843,6 +23294,7 @@ func (r GetHooksNameResponse) ContentType() string {
 // PutHooksNameResponse200Headers the declared response headers of an HTTP 200 response for PutHooksName
 type PutHooksNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutHooksNameResponse400Headers the declared response headers of an HTTP 400 response for PutHooksName
@@ -23355,6 +23807,7 @@ func (r GetHooksNameSchemaResponse) ContentType() string {
 // PatchHooksNameSettingsResponse200Headers the declared response headers of an HTTP 200 response for PatchHooksNameSettings
 type PatchHooksNameSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PatchHooksNameSettingsResponse400Headers the declared response headers of an HTTP 400 response for PatchHooksNameSettings
@@ -23706,6 +24159,7 @@ func (r GetHooksNameStatusResponse) ContentType() string {
 // GetIdentityProvidersResponse200Headers the declared response headers of an HTTP 200 response for GetIdentityProviders
 type GetIdentityProvidersResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetIdentityProvidersResponse401Headers the declared response headers of an HTTP 401 response for GetIdentityProviders
@@ -23839,6 +24293,7 @@ func (r GetIdentityProvidersResponse) ContentType() string {
 // DeleteIdentityProvidersNameResponse204Headers the declared response headers of an HTTP 204 response for DeleteIdentityProvidersName
 type DeleteIdentityProvidersNameResponse204Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteIdentityProvidersNameResponse400Headers the declared response headers of an HTTP 400 response for DeleteIdentityProvidersName
@@ -24022,6 +24477,7 @@ func (r DeleteIdentityProvidersNameResponse) ContentType() string {
 // GetIdentityProvidersNameResponse200Headers the declared response headers of an HTTP 200 response for GetIdentityProvidersName
 type GetIdentityProvidersNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetIdentityProvidersNameResponse400Headers the declared response headers of an HTTP 400 response for GetIdentityProvidersName
@@ -24183,6 +24639,7 @@ func (r GetIdentityProvidersNameResponse) ContentType() string {
 // PutIdentityProvidersNameResponse200Headers the declared response headers of an HTTP 200 response for PutIdentityProvidersName
 type PutIdentityProvidersNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutIdentityProvidersNameResponse400Headers the declared response headers of an HTTP 400 response for PutIdentityProvidersName
@@ -24359,6 +24816,7 @@ func (r PutIdentityProvidersNameResponse) ContentType() string {
 // PatchIdentityProvidersNameSettingsResponse200Headers the declared response headers of an HTTP 200 response for PatchIdentityProvidersNameSettings
 type PatchIdentityProvidersNameSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PatchIdentityProvidersNameSettingsResponse400Headers the declared response headers of an HTTP 400 response for PatchIdentityProvidersNameSettings
@@ -25188,6 +25646,7 @@ func (r DeleteKeysIdResponse) ContentType() string {
 // GetKeysIdResponse200Headers the declared response headers of an HTTP 200 response for GetKeysId
 type GetKeysIdResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetKeysIdResponse400Headers the declared response headers of an HTTP 400 response for GetKeysId
@@ -27357,6 +27816,7 @@ func (r GetOpenapiJsonResponse) ContentType() string {
 // DeleteOverlaySectionResponse200Headers the declared response headers of an HTTP 200 response for DeleteOverlaySection
 type DeleteOverlaySectionResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteOverlaySectionResponse400Headers the declared response headers of an HTTP 400 response for DeleteOverlaySection
@@ -28489,6 +28949,7 @@ func (r PostPluginsReloadResponse) ContentType() string {
 // PostPluginsRollbackResponse200Headers the declared response headers of an HTTP 200 response for PostPluginsRollback
 type PostPluginsRollbackResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PostPluginsRollbackResponse400Headers the declared response headers of an HTTP 400 response for PostPluginsRollback
@@ -30076,6 +30537,7 @@ func (r GetTelemetryResponse) ContentType() string {
 // GetToolsResponse200Headers the declared response headers of an HTTP 200 response for GetTools
 type GetToolsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetToolsResponse401Headers the declared response headers of an HTTP 401 response for GetTools
@@ -30209,6 +30671,7 @@ func (r GetToolsResponse) ContentType() string {
 // DeleteToolsNameResponse204Headers the declared response headers of an HTTP 204 response for DeleteToolsName
 type DeleteToolsNameResponse204Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // DeleteToolsNameResponse400Headers the declared response headers of an HTTP 400 response for DeleteToolsName
@@ -30392,6 +30855,7 @@ func (r DeleteToolsNameResponse) ContentType() string {
 // GetToolsNameResponse200Headers the declared response headers of an HTTP 200 response for GetToolsName
 type GetToolsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // GetToolsNameResponse400Headers the declared response headers of an HTTP 400 response for GetToolsName
@@ -30553,6 +31017,7 @@ func (r GetToolsNameResponse) ContentType() string {
 // PutToolsNameResponse200Headers the declared response headers of an HTTP 200 response for PutToolsName
 type PutToolsNameResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PutToolsNameResponse400Headers the declared response headers of an HTTP 400 response for PutToolsName
@@ -31227,6 +31692,7 @@ func (r GetToolsNameHealthResponse) ContentType() string {
 // PatchToolsNameSettingsResponse200Headers the declared response headers of an HTTP 200 response for PatchToolsNameSettings
 type PatchToolsNameSettingsResponse200Headers struct {
 	CacheControl *string
+	ETag         *string
 }
 
 // PatchToolsNameSettingsResponse400Headers the declared response headers of an HTTP 400 response for PatchToolsNameSettings
@@ -34348,6 +34814,13 @@ func ParseGetAdminAuthResponse(rsp *http.Response) (result *GetAdminAuthResponse
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetAdminAuthResponse401Headers
@@ -34522,6 +34995,13 @@ func ParsePutAdminAuthResponse(rsp *http.Response) (result *PutAdminAuthResponse
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -34714,6 +35194,13 @@ func ParseGetAgentsResponse(rsp *http.Response) (result *GetAgentsResponse, err 
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetAgentsResponse401Headers
@@ -34891,6 +35378,13 @@ func ParseDeleteAgentsNameResponse(rsp *http.Response) (result *DeleteAgentsName
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers204 = &headers
 	case rsp.StatusCode == 400:
@@ -35107,6 +35601,13 @@ func ParseGetAgentsNameResponse(rsp *http.Response) (result *GetAgentsNameRespon
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetAgentsNameResponse400Headers
@@ -35301,6 +35802,13 @@ func ParsePutAgentsNameResponse(rsp *http.Response) (result *PutAgentsNameRespon
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -35944,6 +36452,13 @@ func ParsePatchAgentsNameSettingsResponse(rsp *http.Response) (result *PatchAgen
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -37463,6 +37978,13 @@ func ParseGetConfigResponse(rsp *http.Response) (result *GetConfigResponse, err 
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetConfigResponse401Headers
@@ -37637,6 +38159,13 @@ func ParsePostConfigApplyResponse(rsp *http.Response) (result *PostConfigApplyRe
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -38031,6 +38560,13 @@ func ParsePostConfigReloadResponse(rsp *http.Response) (result *PostConfigReload
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers PostConfigReloadResponse400Headers
@@ -38240,6 +38776,13 @@ func ParsePostConfigRollbackResponse(rsp *http.Response) (result *PostConfigRoll
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers PostConfigRollbackResponse400Headers
@@ -38441,6 +38984,13 @@ func ParseGetConfigSettingsResponse(rsp *http.Response) (result *GetConfigSettin
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetConfigSettingsResponse401Headers
@@ -38615,6 +39165,13 @@ func ParsePutConfigSettingsResponse(rsp *http.Response) (result *PutConfigSettin
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -39361,6 +39918,13 @@ func ParseGetExportResponse(rsp *http.Response) (result *GetExportResponse, err 
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetExportResponse401Headers
@@ -39546,6 +40110,13 @@ func ParseDeleteExportNameResponse(rsp *http.Response) (result *DeleteExportName
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 204:
 		var headers DeleteExportNameResponse204Headers
@@ -39555,6 +40126,13 @@ func ParseDeleteExportNameResponse(rsp *http.Response) (result *DeleteExportName
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers204 = &headers
 	case rsp.StatusCode == 400:
@@ -39771,6 +40349,13 @@ func ParseGetExportNameResponse(rsp *http.Response) (result *GetExportNameRespon
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetExportNameResponse400Headers
@@ -39965,6 +40550,13 @@ func ParsePutExportNameResponse(rsp *http.Response) (result *PutExportNameRespon
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -40185,6 +40777,13 @@ func ParsePatchExportNameSettingsResponse(rsp *http.Response) (result *PatchExpo
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers PatchExportNameSettingsResponse400Headers
@@ -40393,6 +40992,13 @@ func ParseGetGroupsResponse(rsp *http.Response) (result *GetGroupsResponse, err 
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetGroupsResponse400Headers
@@ -40585,6 +41191,13 @@ func ParsePostGroupsResponse(rsp *http.Response) (result *PostGroupsResponse, er
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 201:
 		var headers PostGroupsResponse201Headers
@@ -40594,6 +41207,13 @@ func ParsePostGroupsResponse(rsp *http.Response) (result *PostGroupsResponse, er
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers201 = &headers
 	case rsp.StatusCode == 400:
@@ -40810,6 +41430,13 @@ func ParseDeleteGroupsNameResponse(rsp *http.Response) (result *DeleteGroupsName
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers204 = &headers
 	case rsp.StatusCode == 400:
 		var headers DeleteGroupsNameResponse400Headers
@@ -41025,6 +41652,13 @@ func ParseGetGroupsNameResponse(rsp *http.Response) (result *GetGroupsNameRespon
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetGroupsNameResponse400Headers
@@ -41226,6 +41860,13 @@ func ParsePatchGroupsNameResponse(rsp *http.Response) (result *PatchGroupsNameRe
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -41455,6 +42096,13 @@ func ParsePutGroupsNameResponse(rsp *http.Response) (result *PutGroupsNameRespon
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -41862,6 +42510,13 @@ func ParseGetHooksResponse(rsp *http.Response) (result *GetHooksResponse, err er
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetHooksResponse401Headers
@@ -42044,6 +42699,13 @@ func ParsePostHooksResponse(rsp *http.Response) (result *PostHooksResponse, err 
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 201:
 		var headers PostHooksResponse201Headers
@@ -42053,6 +42715,13 @@ func ParsePostHooksResponse(rsp *http.Response) (result *PostHooksResponse, err 
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers201 = &headers
 	case rsp.StatusCode == 400:
@@ -42269,6 +42938,13 @@ func ParseDeleteHooksNameResponse(rsp *http.Response) (result *DeleteHooksNameRe
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers204 = &headers
 	case rsp.StatusCode == 400:
 		var headers DeleteHooksNameResponse400Headers
@@ -42484,6 +43160,13 @@ func ParseGetHooksNameResponse(rsp *http.Response) (result *GetHooksNameResponse
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetHooksNameResponse400Headers
@@ -42685,6 +43368,13 @@ func ParsePutHooksNameResponse(rsp *http.Response) (result *PutHooksNameResponse
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -43291,6 +43981,13 @@ func ParsePatchHooksNameSettingsResponse(rsp *http.Response) (result *PatchHooks
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers PatchHooksNameSettingsResponse400Headers
@@ -43680,6 +44377,13 @@ func ParseGetIdentityProvidersResponse(rsp *http.Response) (result *GetIdentityP
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetIdentityProvidersResponse401Headers
@@ -43857,6 +44561,13 @@ func ParseDeleteIdentityProvidersNameResponse(rsp *http.Response) (result *Delet
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers204 = &headers
 	case rsp.StatusCode == 400:
@@ -44073,6 +44784,13 @@ func ParseGetIdentityProvidersNameResponse(rsp *http.Response) (result *GetIdent
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetIdentityProvidersNameResponse400Headers
@@ -44267,6 +44985,13 @@ func ParsePutIdentityProvidersNameResponse(rsp *http.Response) (result *PutIdent
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -44486,6 +45211,13 @@ func ParsePatchIdentityProvidersNameSettingsResponse(rsp *http.Response) (result
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -45463,6 +46195,13 @@ func ParseGetKeysIdResponse(rsp *http.Response) (result *GetKeysIdResponse, err 
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -48027,6 +48766,13 @@ func ParseDeleteOverlaySectionResponse(rsp *http.Response) (result *DeleteOverla
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers DeleteOverlaySectionResponse400Headers
@@ -49384,6 +50130,13 @@ func ParsePostPluginsRollbackResponse(rsp *http.Response) (result *PostPluginsRo
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -51247,6 +52000,13 @@ func ParseGetToolsResponse(rsp *http.Response) (result *GetToolsResponse, err er
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 401:
 		var headers GetToolsResponse401Headers
@@ -51424,6 +52184,13 @@ func ParseDeleteToolsNameResponse(rsp *http.Response) (result *DeleteToolsNameRe
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers204 = &headers
 	case rsp.StatusCode == 400:
@@ -51640,6 +52407,13 @@ func ParseGetToolsNameResponse(rsp *http.Response) (result *GetToolsNameResponse
 			}
 			headers.CacheControl = &value
 		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
+		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
 		var headers GetToolsNameResponse400Headers
@@ -51834,6 +52608,13 @@ func ParsePutToolsNameResponse(rsp *http.Response) (result *PutToolsNameResponse
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:
@@ -52641,6 +53422,13 @@ func ParsePatchToolsNameSettingsResponse(rsp *http.Response) (result *PatchTools
 				return nil, err
 			}
 			headers.CacheControl = &value
+		}
+		if values := rsp.Header.Values("ETag"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "ETag", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.ETag = &value
 		}
 		response.Headers200 = &headers
 	case rsp.StatusCode == 400:

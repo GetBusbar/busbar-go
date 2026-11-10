@@ -8,8 +8,8 @@
 //
 {{.}}
 {{- end}}
-{{/* Preserve the config union JSON methods on its request wrapper. */}}
-type {{.TypeName}} {{if or .IsAlias (eq .TypeName "PutConfigSettingsJSONRequestBody")}}={{end}} {{.Schema.TypeDecl}}
+{{/* Preserve custom JSON methods for every inline or referenced union wrapper. */}}
+type {{.TypeName}} {{if or .IsAlias .Schema.UnionElements .Schema.HasCustomMarshalJSON}}={{end}} {{.Schema.TypeDecl}}
 {{end}}
 {{end}}
 {{end}}

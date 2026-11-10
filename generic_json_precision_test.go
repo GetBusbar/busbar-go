@@ -18,12 +18,15 @@ func requireExactGenericNumber(t *testing.T, value any, token string) {
 }
 
 func TestFinalSchemaConfigAccessorsDecodeEditReencode(t *testing.T) {
-	const values = `{"u64":18446744073709551615,"decimal":9007199254.740993,"signed":-9223372036854775808}`
 	for _, mode := range []string{"legacy", "document"} {
 		t.Run(mode, func(t *testing.T) {
-			input := values
+			// RootSettings is a closed object. Arbitrary module-owned keys belong
+			// inside store.settings; document mode addresses them by JSON Pointer.
+			input := `{"store":{"module":"test-store","settings":{"u64":18446744073709551615,"decimal":9007199254.740993,"signed":-9223372036854775808}}}`
+			prefix := ""
 			if mode == "document" {
-				input = `{"document_patch":{"set":` + values + `}}`
+				prefix = "/store/settings/"
+				input = `{"document_patch":{"set":{"/store/settings/u64":18446744073709551615,"/store/settings/decimal":9007199254.740993,"/store/settings/signed":-9223372036854775808}}}`
 			}
 			var body PutConfigSettingsJSONRequestBody
 			if err := json.Unmarshal([]byte(input), &body); err != nil {
@@ -32,11 +35,18 @@ func TestFinalSchemaConfigAccessorsDecodeEditReencode(t *testing.T) {
 			var edited map[string]interface{}
 			if mode == "legacy" {
 				view, err := body.AsPutConfigSettingsJSONBody0()
+				if err != nil || view.Store == nil {
+					t.Fatalf("store accessor: %v", err)
+				}
+				store, err := view.Store.AsPutConfigSettingsJSONBody0Store0()
 				if err != nil {
 					t.Fatal(err)
 				}
-				edited = view
-				view["edited"] = true
+				edited = store["settings"].(map[string]interface{})
+				edited["edited"] = true
+				if err := view.Store.FromPutConfigSettingsJSONBody0Store0(store); err != nil {
+					t.Fatal(err)
+				}
 				if err := body.FromPutConfigSettingsJSONBody0(view); err != nil {
 					t.Fatal(err)
 				}
@@ -46,14 +56,14 @@ func TestFinalSchemaConfigAccessorsDecodeEditReencode(t *testing.T) {
 					t.Fatalf("document accessor: %v", err)
 				}
 				edited = *view.DocumentPatch.Set
-				edited["edited"] = true
+				edited[prefix+"edited"] = true
 				if err := body.FromPutConfigSettingsJSONBody1(view); err != nil {
 					t.Fatal(err)
 				}
 			}
-			requireExactGenericNumber(t, edited["u64"], "18446744073709551615")
-			requireExactGenericNumber(t, edited["decimal"], "9007199254.740993")
-			requireExactGenericNumber(t, edited["signed"], "-9223372036854775808")
+			requireExactGenericNumber(t, edited[prefix+"u64"], "18446744073709551615")
+			requireExactGenericNumber(t, edited[prefix+"decimal"], "9007199254.740993")
+			requireExactGenericNumber(t, edited[prefix+"signed"], "-9223372036854775808")
 			request, err := NewPutConfigSettingsRequest("https://example.test/", nil, body)
 			if err != nil {
 				t.Fatal(err)
@@ -74,12 +84,20 @@ func TestFinalSchemaConfigAccessorsDecodeEditReencode(t *testing.T) {
 					t.Fatal(err)
 				}
 				object = document.DocumentPatch.Set
-			} else if err := json.Unmarshal(raw, &object); err != nil {
-				t.Fatal(err)
+			} else {
+				var legacy struct {
+					Store struct {
+						Settings map[string]json.RawMessage `json:"settings"`
+					} `json:"store"`
+				}
+				if err := json.Unmarshal(raw, &legacy); err != nil {
+					t.Fatal(err)
+				}
+				object = legacy.Store.Settings
 			}
 			for key, token := range map[string]string{"u64": "18446744073709551615", "decimal": "9007199254.740993", "signed": "-9223372036854775808", "edited": "true"} {
-				if string(object[key]) != token {
-					t.Errorf("%s changed on actual request wire: %s, want %s", key, object[key], token)
+				if string(object[prefix+key]) != token {
+					t.Errorf("%s changed on actual request wire: %s, want %s", key, object[prefix+key], token)
 				}
 			}
 		})
