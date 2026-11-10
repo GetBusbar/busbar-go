@@ -237,6 +237,7 @@ const (
 	CandidateRouteCost    ConfigInputHookSignals = "candidate_route_cost"
 	RequestMessageCount   ConfigInputHookSignals = "request_message_count"
 	RequestSystemChars    ConfigInputHookSignals = "request_system_chars"
+	RequestTextComplete   ConfigInputHookSignals = "request_text_complete"
 	RequestToolCount      ConfigInputHookSignals = "request_tool_count"
 	RequestTotalChars     ConfigInputHookSignals = "request_total_chars"
 	RequestedModel        ConfigInputHookSignals = "requested_model"
@@ -258,6 +259,8 @@ func (e ConfigInputHookSignals) Valid() bool {
 	case RequestMessageCount:
 		return true
 	case RequestSystemChars:
+		return true
+	case RequestTextComplete:
 		return true
 	case RequestToolCount:
 		return true
@@ -2971,6 +2974,25 @@ type NamedDefView struct {
 	Unparseable *string `json:"unparseable,omitempty"`
 }
 
+// ObservationUsageView An authoritative dated observation total. Decimal strings preserve exact numeric values
+// in clients whose JSON number representation cannot represent every integer or decimal.
+type ObservationUsageView struct {
+	// AccountingTime Original accounting time, as an exact epoch-seconds integer string.
+	AccountingTime string `json:"accounting_time"`
+
+	// Counts Disjoint raw class counts, as canonical decimal strings. No derived parents are inserted.
+	Counts         map[string]string `json:"counts"`
+	Destination    string            `json:"destination"`
+	Group          string            `json:"group"`
+	Instance       string            `json:"instance"`
+	KeyId          string            `json:"key_id"`
+	RatedSubject   string            `json:"rated_subject"`
+	ServingSubject string            `json:"serving_subject"`
+
+	// SpendMicros Committed spend in micro-units, as an exact decimal string (up to three fractional places).
+	SpendMicros string `json:"spend_micros"`
+}
+
 // OverlayResetView `DELETE /overlay/{section}`, per-section overlay reset result: the section reverted, the
 // resulting config version, and whether anything changed (`false` = the section had no overlay state,
 // an idempotent no-op).
@@ -3725,6 +3747,11 @@ type UsageView struct {
 	// Currency The denomination of every `spend_micros` in this response (`USAGE_CURRENCY`, currently
 	// `"USD"`). A single-const source of truth so removal is one line. Emitted only here.
 	Currency string `json:"currency"`
+
+	// Observations Immutable observation accounting, already included in the totals above. Omitted when
+	// empty. These rows preserve the original serving subject separately from the priced one;
+	// a rate-card snapshot query never reprices their committed charges.
+	Observations *[]ObservationUsageView `json:"observations,omitempty"`
 
 	// Others The summed remainder BEYOND the `by_key` cap, present exactly when `by_key_truncated`, so
 	// every unit of consumption is attributable at least to "others" (FinOps completeness:
