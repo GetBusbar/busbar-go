@@ -101,7 +101,7 @@ func adaptCounts(value any) error {
 				return fmt.Errorf("unsupported x-busbar-count-scale: %v", scale)
 			}
 			if node["type"] != "number" {
-				return fmt.Errorf("Count schema must retain numeric JSON wire type")
+				return fmt.Errorf("count schema must retain numeric JSON wire type")
 			}
 			node["x-go-type"] = "json.Number"
 			// The generated response parsers already import encoding/json. Adding
