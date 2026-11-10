@@ -1362,7 +1362,7 @@ type BuildInfo struct {
 	// AuthModules Auth modules baked into this binary (e.g. `["tokens"]`; empty under `--no-default-features`).
 	AuthModules []string `json:"auth_modules"`
 
-	// HookPlugins Hook plugins baked into this binary (e.g. `["ranking"]`).
+	// HookPlugins Hook plugins baked into this binary (e.g. `["ranking", "complexity"]`).
 	HookPlugins []string `json:"hook_plugins"`
 
 	// WeightedFloor The inline SWRR floor: ALWAYS `true` (compiled in unconditionally, non-removable).
