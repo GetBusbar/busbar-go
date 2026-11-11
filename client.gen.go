@@ -3979,10 +3979,13 @@ type PutConfigSettingsJSONBody0 struct {
 	Health *PutConfigSettingsJSONBody_0_Health `json:"health,omitempty"`
 
 	// Limits Per-field LimitsPatch; omitted members preserve their value. Null datagram_line_memory_bytes explicitly disables that limit.
-	Limits        *PutConfigSettingsJSONBody_0_Limits                                   `json:"limits,omitempty"`
-	Listen        *string                                                               `json:"listen,omitempty"`
-	PerRequestFee *int64                                                                `json:"per_request_fee,omitempty"`
-	RateCard      *map[string]PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties `json:"rate_card,omitempty"`
+	Limits        *PutConfigSettingsJSONBody_0_Limits `json:"limits,omitempty"`
+	Listen        *string                             `json:"listen,omitempty"`
+	PerRequestFee *int64                              `json:"per_request_fee,omitempty"`
+
+	// PluginRateCards Exact common measurement rates by plugin kind, actual configured namespace, and declared class. Integer or decimal-string micro-units per quantity; missing rates remain unpriced. The whole map is replaced when supplied, including an empty map to clear it.
+	PluginRateCards *map[string]map[string]map[string]PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties `json:"plugin_rate_cards,omitempty"`
+	RateCard        *map[string]PutConfigSettingsJSONBody_0_RateCard_AdditionalProperties                              `json:"rate_card,omitempty"`
 
 	// Routing Per-field RoutingPatch; omitted or null members preserve their value.
 	Routing *PutConfigSettingsJSONBody_0_Routing `json:"routing,omitempty"`
@@ -4038,6 +4041,17 @@ type PutConfigSettingsJSONBody0Limits1 = []interface{}
 
 // PutConfigSettingsJSONBody_0_Limits defines parameters for PutConfigSettings.
 type PutConfigSettingsJSONBody_0_Limits struct {
+	union json.RawMessage
+}
+
+// PutConfigSettingsJSONBody0PluginRateCards0 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0PluginRateCards0 = int
+
+// PutConfigSettingsJSONBody0PluginRateCards1 defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody0PluginRateCards1 = string
+
+// PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties defines parameters for PutConfigSettings.
+type PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties struct {
 	union json.RawMessage
 }
 
@@ -6353,6 +6367,68 @@ func (t PutConfigSettingsJSONBody_0_Limits) MarshalJSON() ([]byte, error) {
 }
 
 func (t *PutConfigSettingsJSONBody_0_Limits) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0PluginRateCards0 returns the union data inside the PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties as a PutConfigSettingsJSONBody0PluginRateCards0
+func (t PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) AsPutConfigSettingsJSONBody0PluginRateCards0() (PutConfigSettingsJSONBody0PluginRateCards0, error) {
+	var body PutConfigSettingsJSONBody0PluginRateCards0
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0PluginRateCards0 overwrites any union data inside the PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties as the provided PutConfigSettingsJSONBody0PluginRateCards0
+func (t *PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) FromPutConfigSettingsJSONBody0PluginRateCards0(v PutConfigSettingsJSONBody0PluginRateCards0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0PluginRateCards0 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties, using the provided PutConfigSettingsJSONBody0PluginRateCards0
+func (t *PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) MergePutConfigSettingsJSONBody0PluginRateCards0(v PutConfigSettingsJSONBody0PluginRateCards0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsPutConfigSettingsJSONBody0PluginRateCards1 returns the union data inside the PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties as a PutConfigSettingsJSONBody0PluginRateCards1
+func (t PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) AsPutConfigSettingsJSONBody0PluginRateCards1() (PutConfigSettingsJSONBody0PluginRateCards1, error) {
+	var body PutConfigSettingsJSONBody0PluginRateCards1
+	err := unmarshalJSONExact(t.union, &body)
+	return body, err
+}
+
+// FromPutConfigSettingsJSONBody0PluginRateCards1 overwrites any union data inside the PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties as the provided PutConfigSettingsJSONBody0PluginRateCards1
+func (t *PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) FromPutConfigSettingsJSONBody0PluginRateCards1(v PutConfigSettingsJSONBody0PluginRateCards1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergePutConfigSettingsJSONBody0PluginRateCards1 performs a merge with any union data inside the PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties, using the provided PutConfigSettingsJSONBody0PluginRateCards1
+func (t *PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) MergePutConfigSettingsJSONBody0PluginRateCards1(v PutConfigSettingsJSONBody0PluginRateCards1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *PutConfigSettingsJSONBody_0_PluginRateCards_AdditionalProperties) UnmarshalJSON(b []byte) error {
 	err := t.union.UnmarshalJSON(b)
 	return err
 }
